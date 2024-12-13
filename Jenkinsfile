@@ -63,27 +63,29 @@ pipeline {
             }
         }
 
-        stage('Deploy to Tomcat') {
+stage('Deploy to Tomcat') {
             steps {
                 script {
                     // Dynamically find the WAR file in the target directory
                     def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
                     echo "Deploying WAR file: ${warFile}"
 
-                    withCredentials([usernamePassword(credentialsId: "${TOMCAT_CREDENTIAL_ID}", usernameVariable: 'TOMCAT_USER', passwordVariable: 'TOMCAT_PASS')]) {
-                        // Undeploy existing app from Tomcat
+                    // Use the SSH key stored in Jenkins credentials (ID: 'tomcat')
+                    withCredentials([sshUserPrivateKey(credentialsId: 'tomcat', keyFileVariable: 'SSH_KEY')]) {
+                        // Undeploy the existing application from Tomcat
                         sh """
-                            curl -u ${TOMCAT_USER}:${TOMCAT_PASS} ${TOMCAT_URL}/manager/text/undeploy?path=/wwp
+                            ssh -i ${SSH_KEY} ubuntu@tomcat-server-ip 'curl -u tomcat-user:tomcat-pass ${TOMCAT_URL}/manager/text/undeploy?path=/wwp'
                         """
                         
-                        // Deploy new WAR file to Tomcat
+                        // Deploy the new WAR file to Tomcat
                         sh """
-                            curl -u ${TOMCAT_USER}:${TOMCAT_PASS} -T ${warFile} ${TOMCAT_URL}/manager/text/deploy?path=/wwp&update=true
+                            scp -i ${SSH_KEY} ${warFile} ubuntu@tomcat-server-ip:/path/to/tomcat/webapps/
                         """
                     }
                 }
             }
         }
+
 
     }
 }

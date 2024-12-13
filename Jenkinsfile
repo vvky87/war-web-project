@@ -12,7 +12,7 @@ pipeline {
         NEXUS_URL = "3.109.133.197:8081"
         NEXUS_REPOSITORY = "demo-release"  // Using demo-release
         NEXUS_CREDENTIAL_ID = "nexus_credentials"
-        ARTVERSION = "${env.BUILD_ID}"  // Using BUILD_ID for version, without SNAPSHOT
+        ARTVERSION = "1.0.0"  // Static version for release
         TOMCAT_URL = "http://43.204.147.153:8080"
         TOMCAT_CREDENTIAL_ID = "tomcat_credentials"
     }
@@ -27,7 +27,7 @@ pipeline {
                 success {
                     echo 'Archiving artifacts...'
                     // Archive WAR file generated in the target directory
-                    archiveArtifacts artifacts: '**/target/*.war'
+                    archiveArtifacts artifacts: '**/target/*.war'  // Will archive any WAR file in the target folder
                 }
             }
         }
@@ -35,21 +35,25 @@ pipeline {
         stage('Publish to Nexus Repository Manager') {
             steps {
                 script {
-                    // Upload WAR file and POM file to Nexus repository without SNAPSHOT
+                    // Dynamically find the WAR file in the target directory
+                    def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
+                    echo "WAR file to be uploaded: ${warFile}"
+
+                    // Upload WAR file and POM file to Nexus repository
                     nexusArtifactUploader(
                         nexusVersion: "${NEXUS_VERSION}",
                         protocol: "${NEXUS_PROTOCOL}",
                         nexusUrl: "${NEXUS_URL}",
                         groupId: "com.example.warwebproject",
-                        version: "${ARTVERSION}",  // Using BUILD_ID for release version
+                        version: "${ARTVERSION}",  // Static version for release
                         repository: "demo-release",  // Changed to demo-release
                         credentialsId: "${NEXUS_CREDENTIAL_ID}",
                         artifacts: [
-                            [artifactId: "war-web-project",
+                            [artifactId: "wwp",  // Updated artifactId
                              classifier: '',
-                             file: "target/war-web-project-${ARTVERSION}.war",  // Updated version format
+                             file: warFile,  // Dynamically picked WAR file
                              type: "war"],
-                            [artifactId: "war-web-project",
+                            [artifactId: "wwp",  // Updated artifactId
                              classifier: '',
                              file: "pom.xml",
                              type: "pom"]
@@ -62,15 +66,19 @@ pipeline {
         stage('Deploy to Tomcat') {
             steps {
                 script {
+                    // Dynamically find the WAR file in the target directory
+                    def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
+                    echo "Deploying WAR file: ${warFile}"
+
                     withCredentials([usernamePassword(credentialsId: "${TOMCAT_CREDENTIAL_ID}", usernameVariable: 'TOMCAT_USER', passwordVariable: 'TOMCAT_PASS')]) {
                         // Undeploy existing app from Tomcat
                         sh """
-                            curl -u ${TOMCAT_USER}:${TOMCAT_PASS} ${TOMCAT_URL}/manager/text/undeploy?path=/war-web-project
+                            curl -u ${TOMCAT_USER}:${TOMCAT_PASS} ${TOMCAT_URL}/manager/text/undeploy?path=/wwp
                         """
                         
                         // Deploy new WAR file to Tomcat
                         sh """
-                            curl -u ${TOMCAT_USER}:${TOMCAT_PASS} -T target/war-web-project-${ARTVERSION}.war ${TOMCAT_URL}/manager/text/deploy?path=/war-web-project&update=true
+                            curl -u ${TOMCAT_USER}:${TOMCAT_PASS} -T ${warFile} ${TOMCAT_URL}/manager/text/deploy?path=/wwp&update=true
                         """
                     }
                 }

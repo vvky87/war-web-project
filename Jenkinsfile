@@ -79,7 +79,7 @@ stage('Deploy to Tomcat') {
 
                 // Deploy the new WAR file to the Tomcat webapps folder
                 sh """
-                    scp -o StrictHostKeyChecking=no -i ${SSH_KEY} ${warFile} tomcat@43.204.147.153:/opt/tomcat/webapps/
+                    scp -o StrictHostKeyChecking=no -i ${SSH_KEY} ${warFile} ubuntu@43.204.147.153:/opt/tomcat/webapps/
                 """
             }
         }

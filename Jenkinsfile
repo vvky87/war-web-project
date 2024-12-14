@@ -55,20 +55,19 @@ stage('Deploy to Tomcat') {
         script {
             // Find the WAR file in the target directory
             def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
-
-            // Check if the WAR file exists
-            if (!warFile) {
-                error("WAR file not found")
+            
+            // Check if the WAR file exists, otherwise throw an error
+            if (!fileExists(warFile)) {
+                error("WAR file not found at ${warFile}")
             }
 
             // Print WAR file path to ensure it exists
             echo "WAR file located at: ${warFile}"
 
-            // Use credentials for SSH connection
-            withCredentials([sshUserPrivateKey(credentialsId: 'your-ssh-credentials-id', keyFileVariable: 'SSH_KEY')]) {
-                sh """
+            // Deploy to the Tomcat server without SSH credentials (passwordless authentication)
+            sh """
                 # SSH into the Tomcat server and deploy the new WAR file
-                ssh -o StrictHostKeyChecking=no ubuntu@43.204.147.153 <<EOF
+                ssh -o StrictHostKeyChecking=no -i /path/to/your/private/key ubuntu@43.204.147.153 <<EOF
                     # Temporarily adjust permissions for the webapps directory
                     sudo chmod -R 777 /opt/tomcat/webapps/
 
@@ -89,11 +88,11 @@ stage('Deploy to Tomcat') {
 
                     echo "Deployment complete."
                 EOF
-                """
-            }
+            """
         }
     }
 }
+
 
 
     }

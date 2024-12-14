@@ -50,36 +50,48 @@ pipeline {
             }
         }
 
-        stage('Deploy to Tomcat') {
-            steps {
-                script {
-                    def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
-                    if (!fileExists(warFile)) {
-                        error("WAR file not found at ${warFile}")
-                    }
-                    withCredentials([sshUserPrivateKey(credentialsId: 'your-ssh-credentials-id', keyFileVariable: 'SSH_KEY')]) {
-                        sh """
-                        ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ubuntu@43.204.147.153 <<EOF
-                            # Adjust permissions temporarily
-                            sudo chmod -R 777 /opt/tomcat/webapps/
+stage('Deploy to Tomcat') {
+    steps {
+        script {
+            // Find the WAR file in the target directory
+            def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
+            
+            // Check if the WAR file exists, otherwise throw an error
+            if (!fileExists(warFile)) {
+                error("WAR file not found at ${warFile}")
+            }
 
-                            # Undeploy the existing application
-                            curl -u ${TOMCAT_USERNAME}:${TOMCAT_PASSWORD} ${TOMCAT_URL}/manager/text/undeploy?path=/wwp || true
-                            
-                            # Copy the new WAR file to the Tomcat webapps directory
-                            scp -o StrictHostKeyChecking=no -i ${SSH_KEY} ${warFile} ubuntu@43.204.147.153:/opt/tomcat/webapps/wwp.war
-                            
-                            # Restart Tomcat to apply changes
-                            sudo systemctl restart tomcat
+            // Use credentials for SSH connection
+            withCredentials([sshUserPrivateKey(credentialsId: 'your-ssh-credentials-id', keyFileVariable: 'SSH_KEY')]) {
+                sh """
+                # SSH into the Tomcat server and deploy the new WAR file
+                ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ubuntu@43.204.147.153 <<'EOF'
+                    # Temporarily adjust permissions for the webapps directory
+                    sudo chmod -R 777 /opt/tomcat/webapps/
 
-                            # Restore permissions
-                            sudo chmod -R 755 /opt/tomcat/webapps/
-                        EOF
-                        """
-                    }
-                }
+                    # Undeploy the existing application (if any)
+                    echo "Undeploying previous version..."
+                    curl -u ${TOMCAT_USERNAME}:${TOMCAT_PASSWORD} ${TOMCAT_URL}/manager/text/undeploy?path=/wwp || echo "No existing application to undeploy."
+
+                    # Copy the new WAR file to the Tomcat webapps directory
+                    echo "Deploying new WAR file..."
+                    scp -o StrictHostKeyChecking=no -i ${SSH_KEY} ${warFile} ubuntu@43.204.147.153:/opt/tomcat/webapps/wwp.war
+
+                    # Restart Tomcat to apply the changes
+                    echo "Restarting Tomcat..."
+                    sudo systemctl restart tomcat
+
+                    # Restore permissions for security
+                    sudo chmod -R 755 /opt/tomcat/webapps/
+
+                    echo "Deployment complete."
+                EOF
+                """
             }
         }
+    }
+}
+
     }
 
     post {

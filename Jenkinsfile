@@ -53,7 +53,7 @@ pipeline {
 stage('Deploy to Tomcat') {
     steps {
         script {
-            // Find the WAR file in the target directory
+            // Find the WAR file in the target directory and use absolute path
             def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
             
             // Check if the WAR file exists, otherwise throw an error
@@ -63,6 +63,9 @@ stage('Deploy to Tomcat') {
 
             // Print WAR file path to ensure it exists
             echo "WAR file located at: ${warFile}"
+
+            // Get absolute path of the WAR file
+            def absWarFile = sh(script: "realpath ${warFile}", returnStdout: true).trim()
 
             // Use credentials for SSH connection (passwordless authentication handled)
             sh """
@@ -77,7 +80,7 @@ stage('Deploy to Tomcat') {
 
                     # Copy the new WAR file to the Tomcat webapps directory
                     echo "Deploying new WAR file..."
-                    scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFile} ubuntu@43.204.147.153:/opt/tomcat/webapps/wwp.war
+                    scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${absWarFile} ubuntu@43.204.147.153:/opt/tomcat/webapps/wwp.war
 
                     # Restart Tomcat to apply the changes
                     echo "Restarting Tomcat..."
@@ -92,6 +95,7 @@ stage('Deploy to Tomcat') {
         }
     }
 }
+
 
 
 

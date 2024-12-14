@@ -65,7 +65,7 @@ pipeline {
                             scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ubuntu@43.204.147.153:/tmp/wwp.war
 
                             # Move the WAR file to the correct directory and restart Tomcat
-                            ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ubuntu@43.204.147.153 << EOF
+                            ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ubuntu@43.204.147.153 << 'EOF'
                                 sudo mv /tmp/wwp.war /opt/tomcat/webapps/wwp.war
                                 echo "WAR file deployed successfully to /opt/tomcat/webapps/wwp.war"
                                 sudo systemctl restart tomcat

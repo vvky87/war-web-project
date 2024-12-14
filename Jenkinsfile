@@ -64,10 +64,10 @@ stage('Deploy to Tomcat') {
             // Print WAR file path to ensure it exists
             echo "WAR file located at: ${warFile}"
 
-            // Deploy to the Tomcat server without SSH credentials (passwordless authentication)
+            // Use credentials for SSH connection (passwordless authentication handled)
             sh """
                 # SSH into the Tomcat server and deploy the new WAR file
-                ssh -o StrictHostKeyChecking=no -i /path/to/your/private/key ubuntu@43.204.147.153 <<EOF
+                ssh -o StrictHostKeyChecking=no ubuntu@43.204.147.153 <<EOF
                     # Temporarily adjust permissions for the webapps directory
                     sudo chmod -R 777 /opt/tomcat/webapps/
 
@@ -92,6 +92,7 @@ stage('Deploy to Tomcat') {
         }
     }
 }
+
 
 
 

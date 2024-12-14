@@ -65,7 +65,7 @@ stage('Deploy to Tomcat') {
             echo "WAR file located at: ${warFile}"
 
             // Define the absolute path of the WAR file in Jenkins workspace
-            def warFilePath = "/var/lib/jenkins/workspace/pipeline-new-declarative-way/${warFile}"
+            def warFilePath = "${env.WORKSPACE}/${warFile}"
 
             // Use credentials for SSH connection (passwordless authentication handled)
             sh """
@@ -91,6 +91,7 @@ stage('Deploy to Tomcat') {
         }
     }
 }
+
 
     }
 

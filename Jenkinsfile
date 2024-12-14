@@ -67,7 +67,7 @@ stage('Deploy to Tomcat') {
             // Use credentials for SSH connection (passwordless authentication handled)
             sh """
                 # SSH into the Tomcat server and deploy the new WAR file
-                ssh -o StrictHostKeyChecking=no ubuntu@43.204.147.153 <<EOF
+                ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ubuntu@43.204.147.153 <<EOF
                     # Temporarily adjust permissions for the webapps directory
                     sudo chmod -R 777 /opt/tomcat/webapps/
 
@@ -77,7 +77,7 @@ stage('Deploy to Tomcat') {
 
                     # Copy the new WAR file to the Tomcat webapps directory
                     echo "Deploying new WAR file..."
-                    scp -o StrictHostKeyChecking=no ${warFile} ubuntu@43.204.147.153:/opt/tomcat/webapps/wwp.war
+                    scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFile} ubuntu@43.204.147.153:/opt/tomcat/webapps/wwp.war
 
                     # Restart Tomcat to apply the changes
                     echo "Restarting Tomcat..."
@@ -92,6 +92,7 @@ stage('Deploy to Tomcat') {
         }
     }
 }
+
 
 
 

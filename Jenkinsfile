@@ -71,7 +71,7 @@ stage('Deploy WAR') {
                         # Ensure webapps directory has the right permissions
                         sudo chmod -R 777 /opt/tomcat/webapps/
                         
-                        # Copy WAR file using scp (using absolute path for the WAR file)
+                        # Use full local path to the WAR file for SCP
                         scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ubuntu@43.204.147.153:/opt/tomcat/webapps/wwp.war
                         
                         # Restart Tomcat
@@ -89,6 +89,7 @@ stage('Deploy WAR') {
         }
     }
 }
+
 
     }
 

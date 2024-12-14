@@ -64,12 +64,15 @@ stage('Deploy WAR') {
 
                 // SSH into the remote server and deploy WAR file
                 sh """
-                    # Ensure we're running the SCP from the Jenkins machine, outside the remote SSH session
-                    scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ubuntu@43.204.147.153:/opt/tomcat/webapps/wwp.war
-                    echo "WAR file deployed successfully."
+                    # First, copy the WAR file to a temporary directory on the remote server
+                    scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ubuntu@43.204.147.153:/tmp/wwp.war
                     
-                    # SSH command to restart Tomcat
+                    # Then, move it to the correct directory using sudo
                     ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ubuntu@43.204.147.153 << EOF
+                        sudo mv /tmp/wwp.war /opt/tomcat/webapps/wwp.war
+                        echo "WAR file deployed successfully to /opt/tomcat/webapps/wwp.war"
+                        
+                        # Restart Tomcat
                         echo "Restarting Tomcat..."
                         sudo systemctl restart tomcat
                         echo "Tomcat restarted."
@@ -81,7 +84,6 @@ stage('Deploy WAR') {
         }
     }
 }
-
 
     }
 

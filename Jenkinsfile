@@ -15,7 +15,7 @@ pipeline {
         TOMCAT_URL = "http://43.204.147.153:8080"
         TOMCAT_CREDENTIAL_ID = "tomcat_credentials"
         TOMCAT_USERNAME = "tomcat-user"
-        TOMCAT_PASSWORD = "secure-password"  // Update this with the actual password
+        TOMCAT_PASSWORD = "secure-password" // Update this to the correct password
     }
 
     stages {
@@ -61,13 +61,17 @@ pipeline {
 
                         // Deploy the WAR file to the remote server
                         sh """
-                            # Copy the WAR file to a temporary directory
+                            # Copy the WAR file to a temporary directory on the remote server
                             scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ubuntu@43.204.147.153:/tmp/wwp.war
 
                             # Move the WAR file to the correct directory and restart Tomcat
-                            ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ubuntu@43.204.147.153 << EOF
+                            ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ubuntu@43.204.147.153 <<EOF
+                                set -e
+                                echo "Moving WAR file to Tomcat directory..."
                                 sudo mv /tmp/wwp.war /opt/tomcat/webapps/wwp.war
                                 echo "WAR file deployed successfully to /opt/tomcat/webapps/wwp.war"
+                                
+                                echo "Restarting Tomcat..."
                                 sudo systemctl restart tomcat
                                 echo "Tomcat restarted."
                             EOF
@@ -77,6 +81,18 @@ pipeline {
                     }
                 }
             }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline completed.'
+        }
+        success {
+            echo 'Deployment successful!'
+        }
+        failure {
+            echo 'Deployment failed. Check logs for details.'
         }
     }
 }

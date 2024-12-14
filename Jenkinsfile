@@ -55,7 +55,7 @@ stage('Deploy to Tomcat') {
         script {
             // Find the WAR file in the target directory and use absolute path
             def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
-            
+
             // Check if the WAR file exists, otherwise throw an error
             if (!fileExists(warFile)) {
                 error("WAR file not found at ${warFile}")
@@ -74,10 +74,6 @@ stage('Deploy to Tomcat') {
                     # Temporarily adjust permissions for the webapps directory
                     sudo chmod -R 777 /opt/tomcat/webapps/
 
-                    # Undeploy the existing application (if any)
-                    echo "Undeploying previous version..."
-                    curl -u ${TOMCAT_USERNAME}:${TOMCAT_PASSWORD} ${TOMCAT_URL}/manager/text/undeploy?path=/wwp || echo "No existing application to undeploy."
-
                     # Copy the new WAR file to the Tomcat webapps directory
                     echo "Deploying new WAR file..."
                     scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${absWarFile} ubuntu@43.204.147.153:/opt/tomcat/webapps/wwp.war
@@ -95,11 +91,6 @@ stage('Deploy to Tomcat') {
         }
     }
 }
-
-
-
-
-
 
     }
 

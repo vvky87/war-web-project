@@ -53,7 +53,7 @@ pipeline {
 stage('Deploy to Tomcat') {
     steps {
         script {
-            // Find the WAR file in the target directory and use absolute path
+            // Find the WAR file in the target directory
             def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
 
             // Check if the WAR file exists, otherwise throw an error
@@ -64,19 +64,19 @@ stage('Deploy to Tomcat') {
             // Print WAR file path to ensure it exists
             echo "WAR file located at: ${warFile}"
 
-            // Get absolute path of the WAR file
-            def absWarFile = sh(script: "realpath ${warFile}", returnStdout: true).trim()
+            // Define the absolute path of the WAR file in Jenkins workspace
+            def warFilePath = "/var/lib/jenkins/workspace/pipeline-new-declarative-way/${warFile}"
 
             // Use credentials for SSH connection (passwordless authentication handled)
             sh """
                 # SSH into the Tomcat server and deploy the new WAR file
-                ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ubuntu@43.204.147.153 <<EOF
+                ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ubuntu@43.204.147.153 <<'EOF'
                     # Temporarily adjust permissions for the webapps directory
                     sudo chmod -R 777 /opt/tomcat/webapps/
 
                     # Copy the new WAR file to the Tomcat webapps directory
                     echo "Deploying new WAR file..."
-                    scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${absWarFile} ubuntu@43.204.147.153:/opt/tomcat/webapps/wwp.war
+                    scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ubuntu@43.204.147.153:/opt/tomcat/webapps/wwp.war
 
                     # Restart Tomcat to apply the changes
                     echo "Restarting Tomcat..."

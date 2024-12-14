@@ -50,7 +50,7 @@ pipeline {
             }
         }
 
-stage('Deploy to Tomcat') {
+sstage('Deploy to Tomcat') {
     steps {
         script {
             // Find the WAR file in the target directory
@@ -64,8 +64,12 @@ stage('Deploy to Tomcat') {
             // Print WAR file path to ensure it exists
             echo "WAR file located at: ${warFile}"
 
-            // Define the absolute path of the WAR file in Jenkins workspace
+            // Explicitly get the full path of the WAR file in Jenkins workspace
             def warFilePath = "${env.WORKSPACE}/${warFile}"
+
+            // Print workspace and WAR file path for debugging
+            echo "Workspace: ${env.WORKSPACE}"
+            echo "Full WAR file path: ${warFilePath}"
 
             // Use credentials for SSH connection (passwordless authentication handled)
             sh """
@@ -76,7 +80,7 @@ stage('Deploy to Tomcat') {
 
                     # Copy the new WAR file to the Tomcat webapps directory
                     echo "Deploying new WAR file..."
-                    scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ubuntu@43.204.147.153:/opt/tomcat/webapps/wwp.war
+                    scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ubuntu@43.204.147.153:/opt/tomcat/webapps/
 
                     # Restart Tomcat to apply the changes
                     echo "Restarting Tomcat..."
@@ -91,6 +95,7 @@ stage('Deploy to Tomcat') {
         }
     }
 }
+
 
 
     }

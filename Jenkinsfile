@@ -55,10 +55,10 @@ stage('Deploy to Tomcat') {
         script {
             // Find the WAR file in the target directory
             def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
-            
-            // Check if the WAR file exists, otherwise throw an error
-            if (!fileExists(warFile)) {
-                error("WAR file not found at ${warFile}")
+
+            // Check if the WAR file exists
+            if (!warFile) {
+                error("WAR file not found")
             }
 
             // Print WAR file path to ensure it exists
@@ -68,7 +68,7 @@ stage('Deploy to Tomcat') {
             withCredentials([sshUserPrivateKey(credentialsId: 'your-ssh-credentials-id', keyFileVariable: 'SSH_KEY')]) {
                 sh """
                 # SSH into the Tomcat server and deploy the new WAR file
-                ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ubuntu@43.204.147.153 <<EOF
+                ssh -o StrictHostKeyChecking=no ubuntu@43.204.147.153 <<EOF
                     # Temporarily adjust permissions for the webapps directory
                     sudo chmod -R 777 /opt/tomcat/webapps/
 
@@ -78,7 +78,7 @@ stage('Deploy to Tomcat') {
 
                     # Copy the new WAR file to the Tomcat webapps directory
                     echo "Deploying new WAR file..."
-                    scp -o StrictHostKeyChecking=no -i ${SSH_KEY} ${warFile} ubuntu@43.204.147.153:/opt/tomcat/webapps/wwp.war
+                    scp -o StrictHostKeyChecking=no ${warFile} ubuntu@43.204.147.153:/opt/tomcat/webapps/wwp.war
 
                     # Restart Tomcat to apply the changes
                     echo "Restarting Tomcat..."

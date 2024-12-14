@@ -15,7 +15,7 @@ pipeline {
         TOMCAT_URL = "http://43.204.147.153:8080"
         TOMCAT_CREDENTIAL_ID = "tomcat_credentials"
         TOMCAT_USERNAME = "tomcat-user"
-        TOMCAT_PASSWORD = "secure-password" // Update this to the correct password
+        TOMCAT_PASSWORD = "secure-password"  // Update this with the actual password
     }
 
     stages {
@@ -50,41 +50,34 @@ pipeline {
             }
         }
 
-stage('Deploy WAR') {
-    steps {
-        script {
-            // Dynamically find the latest WAR file in the target directory
-            def warFilePath = sh(script: "find ${workspace}/target -name '*.war' -type f -print0 | xargs -0 ls -t | head -n 1", returnStdout: true).trim()
+        stage('Deploy WAR') {
+            steps {
+                script {
+                    // Find the latest WAR file
+                    def warFilePath = sh(script: "find ${workspace}/target -name '*.war' -type f -print0 | xargs -0 ls -t | head -n 1", returnStdout: true).trim()
 
-            // Check if the WAR file exists
-            if (warFilePath) {
-                // Debug: Output the found WAR file path
-                echo "WAR file located at: ${warFilePath}"
-                sh "ls -l ${warFilePath}"  // Verify WAR file permissions
+                    if (warFilePath) {
+                        echo "WAR file located at: ${warFilePath}"
 
-                // SSH into the remote server and deploy WAR file
-                sh """
-                    # First, copy the WAR file to a temporary directory on the remote server
-                    scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ubuntu@43.204.147.153:/tmp/wwp.war
-                    
-                    # Then, move it to the correct directory using sudo
-                    ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ubuntu@43.204.147.153 << EOF
-                        sudo mv /tmp/wwp.war /opt/tomcat/webapps/wwp.war
-                        echo "WAR file deployed successfully to /opt/tomcat/webapps/wwp.war"
-                        
-                        # Restart Tomcat
-                        echo "Restarting Tomcat..."
-                        sudo systemctl restart tomcat
-                        echo "Tomcat restarted."
-                    EOF
-                """
-            } else {
-                error "No WAR file found to deploy."
+                        // Deploy the WAR file to the remote server
+                        sh """
+                            # Copy the WAR file to a temporary directory
+                            scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ubuntu@43.204.147.153:/tmp/wwp.war
+
+                            # Move the WAR file to the correct directory and restart Tomcat
+                            ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ubuntu@43.204.147.153 << EOF
+                                sudo mv /tmp/wwp.war /opt/tomcat/webapps/wwp.war
+                                echo "WAR file deployed successfully to /opt/tomcat/webapps/wwp.war"
+                                sudo systemctl restart tomcat
+                                echo "Tomcat restarted."
+                            EOF
+                        """
+                    } else {
+                        error "No WAR file found to deploy."
+                    }
+                }
             }
         }
-    }
-}
-
     }
 
     post {

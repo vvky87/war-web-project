@@ -50,51 +50,41 @@ pipeline {
             }
         }
 
-stage('Deploy to Tomcat') {
+stage('Deploy WAR') {
     steps {
         script {
-            // Find the WAR file in the target directory
-            def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
-
-            // Check if the WAR file exists, otherwise throw an error
-            if (!fileExists(warFile)) {
-                error("WAR file not found at ${warFile}")
-            }
-
-            // Print WAR file path to ensure it exists
-            echo "WAR file located at: ${warFile}"
-
-            // Explicitly get the full path of the WAR file in Jenkins workspace
-            def warFilePath = "${env.WORKSPACE}/${warFile}"
-
-            // Print workspace and WAR file path for debugging
-            echo "Workspace: ${env.WORKSPACE}"
-            echo "Full WAR file path: ${warFilePath}"
-
-            // Use credentials for SSH connection (passwordless authentication handled)
+            def warFilePath = "${workspace}/target/wwp-1.0.0.war"
+            
+            // Debug: Check if WAR file exists and permissions
+            echo "Workspace: ${workspace}"
+            echo "WAR file located at: ${warFilePath}"
+            sh "ls -l ${warFilePath}"  // Verify WAR file permissions
+            
+            // SSH into the remote server and deploy WAR file
             sh """
-                # SSH into the Tomcat server and deploy the new WAR file
-                ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ubuntu@43.204.147.153 <<'EOF'
-                    # Temporarily adjust permissions for the webapps directory
-                    sudo chmod -R 777 /opt/tomcat/webapps/
-
-                    # Copy the new WAR file to the Tomcat webapps directory
+                ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ubuntu@43.204.147.153 << 'EOF'
+                    # Debug: Print system info
                     echo "Deploying new WAR file..."
-                    scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ubuntu@43.204.147.153:/opt/tomcat/webapps/
-
-                    # Restart Tomcat to apply the changes
-                    echo "Restarting Tomcat..."
+                    
+                    # Ensure webapps directory has the right permissions
+                    sudo chmod -R 777 /opt/tomcat/webapps/
+                    
+                    # Copy WAR file using scp
+                    scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ubuntu@43.204.147.153:/opt/tomcat/webapps/wwp.war
+                    
+                    # Restart Tomcat
                     sudo systemctl restart tomcat
-
-                    # Restore permissions for security
+                    
+                    # Set proper permissions after restart
                     sudo chmod -R 755 /opt/tomcat/webapps/
-
+                    
                     echo "Deployment complete."
                 EOF
             """
         }
     }
 }
+
 
 
 

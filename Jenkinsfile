@@ -53,7 +53,7 @@ pipeline {
         stage('Deploy WAR') {
             steps {
                 script {
-                    // Find the latest WAR file
+                    // Dynamically find the latest WAR file in the target directory
                     def warFilePath = sh(script: "find ${workspace}/target -name '*.war' -type f -print0 | xargs -0 ls -t | head -n 1", returnStdout: true).trim()
 
                     if (warFilePath) {

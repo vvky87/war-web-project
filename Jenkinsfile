@@ -7,7 +7,7 @@ pipeline {
         TOMCAT_KEY = '/var/lib/jenkins/.ssh/jenkins_key'
         TOMCAT_WEBAPPS_DIR = '/opt/tomcat/webapps/'
         NEXUS_URL = 'http://3.109.203.221:8081/repository/maven-releases/'
-        PATH = "/usr/bin:${env.PATH}" // Ensure Maven is in the PATH
+        PATH = "/usr/share/maven" // Ensure Maven is in the PATH
     }
 
     stages {

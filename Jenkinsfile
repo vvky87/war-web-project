@@ -49,29 +49,21 @@ pipeline {
         }
 
         // Stage 3: Deploy the WAR to Tomcat
-        stage('Deploy to Tomcat') {
-            steps {
-                echo '🚀 Deploying WAR to Tomcat...'
-                withCredentials([sshUserPrivateKey(credentialsId: "${TOMCAT_CREDENTIAL_ID}", keyFileVariable: 'SSH_KEY')]) {
-                    sh '''
-                        # Copy the WAR file to Tomcat's /tmp directory
-                        scp -i ${SSH_KEY} -o StrictHostKeyChecking=no target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
-
-                        # SSH into Tomcat server and deploy the WAR
-                        ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no ${TOMCAT_USER}@${TOMCAT_SERVER} << 'EOF'
-                            # Move WAR to Tomcat's webapps directory
-                            sudo mv /tmp/*.war /opt/tomcat/webapps/
-
-                            # Restart Tomcat to apply changes
-                            sudo systemctl restart tomcat
-
-                            # Check if Tomcat is running
-                            sudo systemctl status tomcat
-                        EOF
-                    '''
-                }
-            }
+    stage('Deploy to Tomcat') {
+    steps {
+        echo '🚀 Deploying WAR to Tomcat...'
+        sshagent (credentials: ['tomcat_creds']) {
+            sh '''
+                scp -o StrictHostKeyChecking=no target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
+                ssh -o StrictHostKeyChecking=no ${TOMCAT_USER}@${TOMCAT_SERVER} << 'EOF'
+                    sudo mv /tmp/*.war /opt/tomcat/webapps/
+                    sudo systemctl restart tomcat
+                EOF
+            '''
         }
+    }
+}
+
 
         // Stage 4: Verify Deployment
         stage('Verify Deployment') {

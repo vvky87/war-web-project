@@ -1,107 +1,73 @@
 pipeline {
-    agent any
+    agent any  // Runs on any available Jenkins agent
 
     environment {
         TOMCAT_SERVER = "43.204.112.166"
-        TOMCAT_USER = "ubuntu" // Changed from root to ubuntu
-        TOMCAT_URL = "http://${TOMCAT_SERVER}:8080"
+        TOMCAT_USER = "ubuntu"
+        TOMCAT_CREDENTIAL_ID = "tomcat_creds"
         ART_VERSION = "1.0.0"
         NEXUS_URL = "3.109.203.221:8081"
         NEXUS_REPOSITORY = "maven-releases"
         NEXUS_CREDENTIAL_ID = "nexus_creds"
-        TOMCAT_CREDENTIAL_ID = "tomcat_creds" // Credentials for copying WAR
     }
 
     tools {
-        maven "maven"
+        maven "maven"  // Using Maven for building the project
     }
 
     stages {
         stage('Build WAR') {
             steps {
-                sh '''
-                    #!/bin/bash
-                    mvn clean package -DskipTests
-                '''
-                archiveArtifacts artifacts: '**/target/*.war'
+                echo 'Building WAR file...'
+                sh 'mvn clean package -DskipTests'  // Build the project without running tests
+                archiveArtifacts artifacts: '**/target/*.war'  // Archive the WAR file
             }
         }
 
         stage('Publish to Nexus') {
             steps {
+                echo 'Publishing WAR to Nexus...'
                 script {
                     def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
-                    def pomFile = "pom.xml"
-
-                    if (!fileExists(warFile)) {
-                        error("WAR file not found at ${warFile}")
-                    }
-                    if (!fileExists(pomFile)) {
-                        error("POM file not found.")
-                    }
 
                     nexusArtifactUploader(
                         nexusVersion: "nexus3",
                         protocol: "http",
                         nexusUrl: "${NEXUS_URL}",
-                        groupId: "com.example.warwebproject",
+                        groupId: "com.example",
                         version: "${ART_VERSION}",
                         repository: "${NEXUS_REPOSITORY}",
                         credentialsId: "${NEXUS_CREDENTIAL_ID}",
                         artifacts: [
-                            [artifactId: "wwp", classifier: '', file: warFile, type: "war"],
-                            [artifactId: "wwp", classifier: '', file: pomFile, type: "pom"]
+                            [artifactId: "simple-war", classifier: '', file: warFile, type: "war"]
                         ]
                     )
                 }
             }
         }
 
-        stage('Deploy WAR') {
+        stage('Deploy to Tomcat') {
             steps {
-                script {
-                    def warFilePath = sh(script: "find target -name '*.war' -type f -print0 | xargs -0 ls -t | head -n 1", returnStdout: true).trim()
-
-                    if (warFilePath) {
-                        echo "WAR file located at: ${warFilePath}"
-
-                        sshagent([TOMCAT_CREDENTIAL_ID]) {
-                            sh '''
-                                #!/bin/bash
-                                set -e
-
-                                # Copy WAR file to the remote server
-                                scp -o StrictHostKeyChecking=no -o BatchMode=yes ${warFilePath} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/wwp.war || { echo "SCP failed."; exit 1; }
-
-                                # Deploy WAR file on the remote server
-                                ssh -o StrictHostKeyChecking=no -o BatchMode=yes ${TOMCAT_USER}@${TOMCAT_SERVER} <<'EOF'
-                                    set -e
-                                    echo "Moving WAR file to Tomcat directory..."
-                                    sudo mv /tmp/wwp.war /opt/tomcat/webapps/wwp.war
-                                    echo "WAR file deployed successfully."
-                                    echo "Restarting Tomcat..."
-                                    sudo systemctl restart tomcat
-                                    echo "Tomcat restarted."
-                                EOF
-                            '''
-                        }
-                    } else {
-                        error "No WAR file found to deploy."
-                    }
+                echo 'Deploying WAR to Tomcat...'
+                withCredentials([sshUserPrivateKey(credentialsId: TOMCAT_CREDENTIAL_ID, keyFileVariable: 'SSH_KEY')]) {
+                    sh '''
+                        scp -i ${SSH_KEY} -o StrictHostKeyChecking=no target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
+                        ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no ${TOMCAT_USER}@${TOMCAT_SERVER} << 'EOF'
+                            sudo mv /tmp/*.war /opt/tomcat/webapps/
+                            sudo systemctl restart tomcat
+                        EOF
+                    '''
                 }
             }
         }
     }
 
     post {
-        always {
-            echo 'Pipeline completed.'
-        }
         success {
-            echo 'Deployment successful!'
+            echo '✅ Deployment successful!'
         }
         failure {
-            echo 'Deployment failed. Check logs for details.'
+            echo '❌ Deployment failed. Check the logs!'
         }
     }
 }

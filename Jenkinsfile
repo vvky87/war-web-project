@@ -94,7 +94,7 @@ pipeline {
                             set -e
 
                             # Copy WAR file to the remote server
-                            scp -o StrictHostKeyChecking=no -o BatchMode=yes -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${warFilePath} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/wwp.war || { echo "SCP failed."; exit 1; }
+                         scp -o StrictHostKeyChecking=no -o BatchMode=yes -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${warFilePath} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/wwp.war
 
                             # Deploy WAR file on the remote server
                             ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} <<'EOF'

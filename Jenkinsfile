@@ -10,12 +10,12 @@ pipeline {
         NEXUS_PROTOCOL = "http"
         NEXUS_URL = "3.109.133.197:8081"
         NEXUS_REPOSITORY = "maven-releases"
-        NEXUS_CREDENTIAL_ID = "nexus_credentials"
-        ART_VERSION = "1.0.0" // Align with the build log version
-        TOMCAT_URL = "http://43.204.112.166:8080" // Updated IP
-        TOMCAT_CREDENTIAL_ID = "tomcat_credentials"
+        NEXUS_CREDENTIAL_ID = "nexus_creds" // Corrected credential ID
+        ART_VERSION = "1.0.0"
+        TOMCAT_URL = "http://43.204.112.166:8080" // Updated Tomcat IP
+        TOMCAT_CREDENTIAL_ID = "tomcat_creds"
         TOMCAT_USERNAME = "tomcat-user"
-        TOMCAT_PASSWORD = "secure-password" // Update securely
+        TOMCAT_PASSWORD = "secure-password" // Ensure this is updated securely
     }
 
     stages {
@@ -46,7 +46,7 @@ pipeline {
                         groupId: "com.example.warwebproject",
                         version: "${ART_VERSION}",
                         repository: "${NEXUS_REPOSITORY}",
-                        credentialsId: "${NEXUS_CREDENTIAL_ID}",
+                        credentialsId: "${NEXUS_CREDENTIAL_ID}", // Corrected
                         artifacts: [
                             [artifactId: "wwp", classifier: '', file: warFile, type: "war"],
                             [artifactId: "wwp", classifier: '', file: pomFile, type: "pom"]

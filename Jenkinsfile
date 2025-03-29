@@ -1,22 +1,39 @@
 pipeline {
     agent any
 
+    environment {
+        TOMCAT_SERVER = "43.204.112.166"
+        TOMCAT_USER = "admin"
+        SSH_KEY_PATH = "/var/lib/jenkins/.ssh/jenkins_key"
+        TOMCAT_URL = "http://${TOMCAT_SERVER}:8080"
+        ART_VERSION = "1.0.0"
+        NEXUS_URL = "3.109.203.221:8081"
+        NEXUS_REPOSITORY = "maven-releases"
+        NEXUS_CREDENTIAL_ID = "nexus_creds"
+    }
+
     tools {
         maven "maven"
     }
 
-    environment {
-        NEXUS_VERSION = "nexus3"
-        NEXUS_PROTOCOL = "http"
-        NEXUS_URL = "3.109.203.221:8081"
-        NEXUS_REPOSITORY = "maven-releases"
-        NEXUS_CREDENTIAL_ID = "nexus_creds"
-        ART_VERSION = "1.0.0"
-        TOMCAT_URL = "http://43.204.112.166:8080"
-        TOMCAT_CREDENTIAL_ID = "tomcat_creds"
-    }
-
     stages {
+        stage('Setup SSH Key') {
+            steps {
+                script {
+                    if (!fileExists(SSH_KEY_PATH)) {
+                        echo "SSH key not found. Generating..."
+                        sh """
+                            mkdir -p /var/lib/jenkins/.ssh
+                            ssh-keygen -t rsa -b 2048 -f ${SSH_KEY_PATH} -N ""
+                            chmod 600 ${SSH_KEY_PATH}
+                        """
+                    } else {
+                        echo "SSH key exists."
+                    }
+                }
+            }
+        }
+
         stage('Build WAR') {
             steps {
                 sh 'mvn clean package -DskipTests'
@@ -38,8 +55,8 @@ pipeline {
                     }
 
                     nexusArtifactUploader(
-                        nexusVersion: "${NEXUS_VERSION}",
-                        protocol: "${NEXUS_PROTOCOL}",
+                        nexusVersion: "nexus3",
+                        protocol: "http",
                         nexusUrl: "${NEXUS_URL}",
                         groupId: "com.example.warwebproject",
                         version: "${ART_VERSION}",
@@ -57,27 +74,24 @@ pipeline {
         stage('Deploy WAR') {
             steps {
                 script {
-                    def warFilePath = sh(script: "find ${workspace}/target -name '*.war' -type f -print0 | xargs -0 ls -t | head -n 1", returnStdout: true).trim()
+                    def warFilePath = sh(script: "find target -name '*.war' -type f -print0 | xargs -0 ls -t | head -n 1", returnStdout: true).trim()
 
                     if (warFilePath) {
                         echo "WAR file located at: ${warFilePath}"
 
-                        withCredentials([usernamePassword(credentialsId: "${TOMCAT_CREDENTIAL_ID}", usernameVariable: 'TOMCAT_USER', passwordVariable: 'TOMCAT_PASS')]) {
-                            sh """
-                                scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key -o UserKnownHostsFile=/dev/null ${warFilePath} ${TOMCAT_USER}@43.204.112.166:/tmp/wwp.war
+                        sh """
+                            scp -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${warFilePath} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/wwp.war
 
-                                ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@43.204.112.166 <<EOF
-                                    set -e
-                                    echo "Moving WAR file to Tomcat directory..."
-                                    sudo mv /tmp/wwp.war /opt/tomcat/webapps/wwp.war
-                                    echo "WAR file deployed successfully."
-
-                                    echo "Restarting Tomcat..."
-                                    echo ${TOMCAT_PASS} | sudo -S systemctl restart tomcat
-                                    echo "Tomcat restarted."
-                                EOF
-                            """
-                        }
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} <<EOF
+                                set -e
+                                echo "Moving WAR file to Tomcat directory..."
+                                sudo mv /tmp/wwp.war /opt/tomcat/webapps/wwp.war
+                                echo "WAR file deployed successfully."
+                                echo "Restarting Tomcat..."
+                                sudo systemctl restart tomcat
+                                echo "Tomcat restarted."
+                            EOF
+                        """
                     } else {
                         error "No WAR file found to deploy."
                     }

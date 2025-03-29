@@ -10,12 +10,10 @@ pipeline {
         NEXUS_PROTOCOL = "http"
         NEXUS_URL = "3.109.203.221:8081"
         NEXUS_REPOSITORY = "maven-releases"
-        NEXUS_CREDENTIAL_ID = "nexus_credentials"
+        NEXUS_CREDENTIAL_ID = "nexus_creds"
         ART_VERSION = "1.0.0"
         TOMCAT_URL = "http://43.204.112.166:8080"
-        TOMCAT_CREDENTIAL_ID = "tomcat_credentials"
-        TOMCAT_USERNAME = "tomcat-user"
-        TOMCAT_PASSWORD = "secure-password"
+        TOMCAT_CREDENTIAL_ID = "tomcat_creds"  // Using the added credential ID
     }
 
     stages {
@@ -39,25 +37,19 @@ pipeline {
                         error("POM file not found.")
                     }
 
-                    try {
-                        echo "Uploading to Nexus: ${NEXUS_URL}/${NEXUS_REPOSITORY}"
-                        nexusArtifactUploader(
-                            nexusVersion: "${NEXUS_VERSION}",
-                            protocol: "${NEXUS_PROTOCOL}",
-                            nexusUrl: "${NEXUS_URL}",
-                            groupId: "com.example.warwebproject",
-                            version: "${ART_VERSION}",
-                            repository: "${NEXUS_REPOSITORY}",
-                            credentialsId: "${NEXUS_CREDENTIAL_ID}",
-                            artifacts: [
-                                [artifactId: "wwp", classifier: '', file: warFile, type: "war"],
-                                [artifactId: "wwp", classifier: '', file: pomFile, type: "pom"]
-                            ]
-                        )
-                        echo "Artifact successfully uploaded to Nexus."
-                    } catch (err) {
-                        error("Failed to upload artifact to Nexus: ${err}")
-                    }
+                    nexusArtifactUploader(
+                        nexusVersion: "${NEXUS_VERSION}",
+                        protocol: "${NEXUS_PROTOCOL}",
+                        nexusUrl: "${NEXUS_URL}",
+                        groupId: "com.example.warwebproject",
+                        version: "${ART_VERSION}",
+                        repository: "${NEXUS_REPOSITORY}",
+                        credentialsId: "${NEXUS_CREDENTIAL_ID}",
+                        artifacts: [
+                            [artifactId: "wwp", classifier: '', file: warFile, type: "war"],
+                            [artifactId: "wwp", classifier: '', file: pomFile, type: "pom"]
+                        ]
+                    )
                 }
             }
         }
@@ -70,23 +62,21 @@ pipeline {
                     if (warFilePath) {
                         echo "WAR file located at: ${warFilePath}"
 
-                        try {
+                        withCredentials([usernamePassword(credentialsId: "${TOMCAT_CREDENTIAL_ID}", usernameVariable: 'TOMCAT_USER', passwordVariable: 'TOMCAT_PASS')]) {
                             sh """
-                                scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ubuntu@43.204.112.166:/tmp/wwp.war
+                                scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ${TOMCAT_USER}@43.204.112.166:/tmp/wwp.war
 
-                                ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ubuntu@43.204.112.166 <<EOF
+                                ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${TOMCAT_USER}@43.204.112.166 <<EOF
                                     set -e
                                     echo "Moving WAR file to Tomcat directory..."
                                     sudo mv /tmp/wwp.war /opt/tomcat/webapps/wwp.war
                                     echo "WAR file deployed successfully."
 
                                     echo "Restarting Tomcat..."
-                                    sudo systemctl restart tomcat
+                                    echo ${TOMCAT_PASS} | sudo -S systemctl restart tomcat
                                     echo "Tomcat restarted."
                                 EOF
                             """
-                        } catch (err) {
-                            error("Deployment to Tomcat failed: ${err}")
                         }
                     } else {
                         error "No WAR file found to deploy."

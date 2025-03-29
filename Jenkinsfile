@@ -13,7 +13,7 @@ pipeline {
         NEXUS_CREDENTIAL_ID = "nexus_creds"
         ART_VERSION = "1.0.0"
         TOMCAT_URL = "http://43.204.112.166:8080"
-        TOMCAT_CREDENTIAL_ID = "tomcat_creds"  // Using the added credential ID
+        TOMCAT_CREDENTIAL_ID = "tomcat_creds"
     }
 
     stages {
@@ -64,9 +64,9 @@ pipeline {
 
                         withCredentials([usernamePassword(credentialsId: "${TOMCAT_CREDENTIAL_ID}", usernameVariable: 'TOMCAT_USER', passwordVariable: 'TOMCAT_PASS')]) {
                             sh """
-                                scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ${TOMCAT_USER}@43.204.112.166:/tmp/wwp.war
+                                scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key -o UserKnownHostsFile=/dev/null ${warFilePath} ${TOMCAT_USER}@43.204.112.166:/tmp/wwp.war
 
-                                ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${TOMCAT_USER}@43.204.112.166 <<EOF
+                                ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@43.204.112.166 <<EOF
                                     set -e
                                     echo "Moving WAR file to Tomcat directory..."
                                     sudo mv /tmp/wwp.war /opt/tomcat/webapps/wwp.war

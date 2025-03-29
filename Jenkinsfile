@@ -30,7 +30,7 @@ stage('SonarQube Analysis') {
                     }
                 }
             }
-
+}
         stage('Build WAR') {
             steps {
                 sh 'mvn clean package -DskipTests'

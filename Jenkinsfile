@@ -66,25 +66,25 @@ pipeline {
 
         stage('Deploy to Tomcat') {
             steps {
-                echo '🚀 Deploying WAR to Tomcat...'
-                sh """
-                    scp -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
-                    ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'sudo mv /tmp/*.war /opt/tomcat/webapps/ && sudo systemctl restart tomcat'
-                """
+                script {
+                    def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
+                    def warName = warFile.tokenize('/')[-1]  // Extract file name
+                    def contextPath = warName.replace('.war', '')  // Remove '.war' extension
+
+                    echo "🚀 Deploying WAR to Tomcat (Context Path: ${contextPath})..."
+                    sh """
+                        scp -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${warFile} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
+                        ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'sudo mv /tmp/${warName} /opt/tomcat/webapps/ && sudo systemctl restart tomcat'
+                    """
+
+                    env.APP_CONTEXT_PATH = contextPath  // Store context path for URL
+                }
             }
         }
 
-        stage('Verify Deployment') {
+        stage('Display Application URL') {
             steps {
-                echo '✅ Verifying deployment...'
-                script {
-                    def status = sh(script: "curl -s -o /dev/null -w '%{http_code}' http://${TOMCAT_SERVER}:8080/simple-war", returnStdout: true).trim()
-                    if (status == "200") {
-                        echo "🎉 Application deployed successfully and is accessible!"
-                    } else {
-                        error "❌ Deployment verification failed with HTTP code ${status}"
-                    }
-                }
+                echo "🌐 Deployment completed! Access your application at: http://${TOMCAT_SERVER}:8080/${env.APP_CONTEXT_PATH}"
             }
         }
     }

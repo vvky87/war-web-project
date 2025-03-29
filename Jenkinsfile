@@ -39,16 +39,24 @@ pipeline {
                 echo '📦 Publishing WAR to Nexus...'
                 script {
                     def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
+
+                    // Extract values from pom.xml
+                    def groupId = sh(script: "mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout", returnStdout: true).trim()
+                    def artifactId = sh(script: "mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout", returnStdout: true).trim()
+                    def version = sh(script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout", returnStdout: true).trim()
+
+                    echo "Publishing ${artifactId}-${version}.war with groupId: ${groupId}"
+
                     nexusArtifactUploader(
                         nexusVersion: "nexus3",
                         protocol: "http",
                         nexusUrl: "${NEXUS_URL}",
-                        groupId: "com.example",
-                        version: "${ART_VERSION}",
+                        groupId: "${groupId}",
+                        version: "${version}",
                         repository: "${NEXUS_REPOSITORY}",
                         credentialsId: "${NEXUS_CREDENTIAL_ID}",
                         artifacts: [
-                            [artifactId: "simple-war", classifier: '', file: warFile, type: "war"]
+                            [artifactId: "${artifactId}", classifier: '', file: warFile, type: "war"]
                         ]
                     )
                 }
@@ -66,25 +74,27 @@ pipeline {
 
         stage('Deploy to Tomcat') {
             steps {
+                echo '🚀 Deploying WAR to Tomcat...'
                 script {
                     def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
-                    def warName = warFile.tokenize('/')[-1]  // Extract file name
-                    def contextPath = warName.replace('.war', '')  // Remove '.war' extension
+                    def artifactId = sh(script: "mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout", returnStdout: true).trim()
 
-                    echo "🚀 Deploying WAR to Tomcat (Context Path: ${contextPath})..."
                     sh """
                         scp -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${warFile} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
-                        ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'sudo mv /tmp/${warName} /opt/tomcat/webapps/ && sudo systemctl restart tomcat'
+                        ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'sudo mv /tmp/${artifactId}-*.war /opt/tomcat/webapps/ && sudo systemctl restart tomcat'
                     """
-
-                    env.APP_CONTEXT_PATH = contextPath  // Store context path for URL
                 }
             }
         }
 
         stage('Display Application URL') {
             steps {
-                echo "🌐 Deployment completed! Access your application at: http://${TOMCAT_SERVER}:8080/${env.APP_CONTEXT_PATH}"
+                script {
+                    def artifactId = sh(script: "mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout", returnStdout: true).trim()
+                    def url = "http://${TOMCAT_SERVER}:8080/${artifactId}-${env.ART_VERSION}"
+
+                    echo "🌐 Deployment completed! Access your application at: ${url}"
+                }
             }
         }
     }

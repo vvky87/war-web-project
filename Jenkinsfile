@@ -17,7 +17,7 @@ pipeline {
     }
 
     stages {
-       stage('SonarQube Analysis') {
+stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube Server') {
                     withCredentials([string(credentialsId: env.SONAR_CREDENTIAL_ID, variable: 'SONAR_TOKEN')]) {
@@ -30,7 +30,6 @@ pipeline {
                     }
                 }
             }
-
 
         stage('Build WAR') {
             steps {

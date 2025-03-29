@@ -1,47 +1,16 @@
 pipeline {
     agent any
 
-    environment {
-        TOMCAT_SERVER = "43.204.112.166"
-        TOMCAT_USER = "ubuntu"
-        ART_VERSION = "1.0.0"
-        NEXUS_URL = "3.109.203.221:8081"
-        NEXUS_REPOSITORY = "maven-releases"
-        NEXUS_CREDENTIAL_ID = "nexus_creds"
-        SSH_KEY_PATH = "/var/lib/jenkins/.ssh/id_rsa"  // Path to Jenkins private key
-    }
-
     tools {
         maven "maven"
     }
 
     stages {
-        // Stage 1: Verify Tomcat Connection
-        stage('Verify Tomcat Connection') {
-            steps {
-                echo '🔗 Verifying connection to Tomcat server...'
-                script {
-                    // Add SSH key to the agent if not present
-                    sh """
-                        mkdir -p ~/.ssh
-                        cp ${SSH_KEY_PATH} ~/.ssh/id_rsa
-                        chmod 600 ~/.ssh/id_rsa
-                        ssh-keyscan -H ${TOMCAT_SERVER} >> ~/.ssh/known_hosts
-                    """
-
-                    // Test SSH connection
-                    def sshTest = sh(script: "ssh -v -o BatchMode=yes -o ConnectTimeout=5 -i ~/.ssh/id_rsa ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo connection successful'", returnStatus: true)
-                    if (sshTest != 0) {
-                        error "❌ Unable to establish SSH connection to Tomcat server at ${TOMCAT_SERVER}. Check the SSH key or network settings."
-                    } else {
-                        echo "✅ SSH connection to Tomcat server established successfully!"
-                    }
-                }
-            }
-        }
-
-        // Stage 2: Build WAR file
+        // Stage 1: Build WAR
         stage('Build WAR') {
+            environment {
+                ART_VERSION = "1.0.0"
+            }
             steps {
                 echo '🔨 Building WAR file...'
                 sh 'mvn clean package -DskipTests'
@@ -49,8 +18,13 @@ pipeline {
             }
         }
 
-        // Stage 3: Publish to Nexus
+        // Stage 2: Publish to Nexus
         stage('Publish to Nexus') {
+            environment {
+                NEXUS_URL = "3.109.203.221:8081"
+                NEXUS_REPOSITORY = "maven-releases"
+                NEXUS_CREDENTIAL_ID = "nexus_creds"
+            }
             steps {
                 echo '📦 Publishing WAR to Nexus...'
                 script {
@@ -72,8 +46,44 @@ pipeline {
             }
         }
 
+        // Stage 3: Verify SSH Connection to Tomcat
+        stage('Verify SSH Connection') {
+            environment {
+                TOMCAT_SERVER = "43.204.112.166"
+                TOMCAT_USER = "ubuntu"
+                SSH_PRIVATE_KEY = '''-----BEGIN RSA PRIVATE KEY-----
+                YOUR_PRIVATE_KEY_CONTENT_HERE
+                -----END RSA PRIVATE KEY-----'''
+            }
+            steps {
+                script {
+                    echo '🔗 Verifying connection to Tomcat server...'
+
+                    // Setup SSH key
+                    sh """
+                        mkdir -p ~/.ssh
+                        echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
+                        chmod 600 ~/.ssh/id_rsa
+                        ssh-keyscan -H ${TOMCAT_SERVER} >> ~/.ssh/known_hosts
+                    """
+
+                    // Verify SSH connection
+                    def sshTest = sh(script: "ssh -o BatchMode=yes -o ConnectTimeout=5 -i ~/.ssh/id_rsa ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo connection successful'", returnStatus: true)
+                    if (sshTest != 0) {
+                        error "❌ Unable to establish SSH connection to Tomcat server at ${TOMCAT_SERVER}."
+                    } else {
+                        echo "✅ SSH connection established successfully!"
+                    }
+                }
+            }
+        }
+
         // Stage 4: Deploy to Tomcat
         stage('Deploy to Tomcat') {
+            environment {
+                TOMCAT_SERVER = "43.204.112.166"
+                TOMCAT_USER = "ubuntu"
+            }
             steps {
                 echo '🚀 Deploying WAR to Tomcat...'
                 sh '''
@@ -88,6 +98,9 @@ pipeline {
 
         // Stage 5: Verify Deployment
         stage('Verify Deployment') {
+            environment {
+                TOMCAT_SERVER = "43.204.112.166"
+            }
             steps {
                 echo '✅ Verifying deployment...'
                 script {

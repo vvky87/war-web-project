@@ -49,7 +49,7 @@ pipeline {
             steps {
                 echo '🔗 Verifying connection to Tomcat server...'
                 sh """
-                    ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} "echo 'Connection successful'"
+                    ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo "Connection successful"'
                 """
             }
         }

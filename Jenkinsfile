@@ -26,7 +26,6 @@ pipeline {
         stage('Extract Version') {
             steps {
                 script {
-                    // Extract version from pom.xml
                     def version = sh(script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout", returnStdout: true).trim()
                     env.ART_VERSION = version
                     echo "📦 Detected version: ${env.ART_VERSION}"
@@ -39,11 +38,9 @@ pipeline {
                 echo '📦 Publishing WAR to Nexus...'
                 script {
                     def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
-
-                    // Extract values from pom.xml
                     def groupId = sh(script: "mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout", returnStdout: true).trim()
                     def artifactId = sh(script: "mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout", returnStdout: true).trim()
-                    def version = sh(script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout", returnStdout: true).trim()
+                    def version = env.ART_VERSION
 
                     echo "Publishing ${artifactId}-${version}.war with groupId: ${groupId}"
 
@@ -59,16 +56,11 @@ pipeline {
                             [artifactId: "${artifactId}", classifier: '', file: warFile, type: "war"]
                         ]
                     )
-                }
-            }
-        }
 
-        stage('Verify SSH Connection') {
-            steps {
-                echo '🔗 Verifying connection to Tomcat server...'
-                sh """
-                    ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} "echo 'Connection successful'"
-                """
+                    // Display Nexus URL after upload
+                    def nexusUrl = "http://${NEXUS_URL}/repository/${NEXUS_REPOSITORY}/${groupId.replace('.', '/')}/${artifactId}/${version}/${artifactId}-${version}.war"
+                    env.NEXUS_URL_DISPLAY = nexusUrl
+                }
             }
         }
 
@@ -87,13 +79,14 @@ pipeline {
             }
         }
 
-        stage('Display Application URL') {
+        stage('Display Application and Nexus URLs') {
             steps {
                 script {
                     def artifactId = sh(script: "mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout", returnStdout: true).trim()
-                    def url = "http://${TOMCAT_SERVER}:8080/${artifactId}-${env.ART_VERSION}"
+                    def appUrl = "http://${TOMCAT_SERVER}:8080/${artifactId}-${env.ART_VERSION}"
 
-                    echo "🌐 Deployment completed! Access your application at: ${url}"
+                    echo "🌐 Deployment completed! Access your application at: ${appUrl}"
+                    echo "📦 Artifact available at Nexus: ${env.NEXUS_URL_DISPLAY}"
                 }
             }
         }

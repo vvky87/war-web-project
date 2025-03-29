@@ -5,10 +5,7 @@ pipeline {
         TOMCAT_SERVER = "43.204.112.166"
         TOMCAT_USER = "admin"
         SSH_KEY_PATH = "/var/lib/jenkins/.ssh/jenkins_key"
-        TOMCAT_WEBAPPS_DIR = "/opt/tomcat/webapps"
-        TOMCAT_SERVICE = "tomcat"
-        TOMCAT_PORT = "8080"
-        TOMCAT_URL = "http://${TOMCAT_SERVER}:${TOMCAT_PORT}"
+        TOMCAT_URL = "http://${TOMCAT_SERVER}:8080"
         ART_VERSION = "1.0.0"
         NEXUS_URL = "3.109.203.221:8081"
         NEXUS_REPOSITORY = "maven-releases"
@@ -34,18 +31,10 @@ pipeline {
                         echo "SSH key exists."
                     }
 
-                    // Add public key to remote server if not already added
-                    def publicKey = readFile("${SSH_KEY_PATH}.pub").trim()
-                    def remoteKeyCheck = sh(script: "ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'grep \"${publicKey}\" ~/.ssh/authorized_keys || echo notfound'", returnStdout: true).trim()
-
-                    if (remoteKeyCheck == "notfound") {
-                        echo "Adding public key to remote server..."
-                        sh """
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} "mkdir -p ~/.ssh && echo '${publicKey}' >> ~/.ssh/authorized_keys"
-                        """
-                    } else {
-                        echo "Public key already exists on the remote server."
-                    }
+                    // Test SSH connectivity
+                    sh """
+                        ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo "SSH connection successful!"' || error("SSH connection failed. Check key permissions and remote server access.")
+                    """
                 }
             }
         }
@@ -87,17 +76,6 @@ pipeline {
             }
         }
 
-        stage('Test SSH Connection') {
-            steps {
-                script {
-                    echo "Testing SSH connection to ${TOMCAT_SERVER}..."
-                    sh """
-                        ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo "SSH connection successful!"'
-                    """
-                }
-            }
-        }
-
         stage('Deploy WAR') {
             steps {
                 script {
@@ -107,15 +85,15 @@ pipeline {
                         echo "WAR file located at: ${warFilePath}"
 
                         sh """
-                            scp -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${warFilePath} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/wwp.war
+                            scp -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${warFilePath} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/wwp.war || error("SCP failed. Check SSH key permissions and server access.")
 
                             ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} <<EOF
                                 set -e
                                 echo "Moving WAR file to Tomcat directory..."
-                                sudo mv /tmp/wwp.war ${TOMCAT_WEBAPPS_DIR}/wwp.war
+                                sudo mv /tmp/wwp.war /opt/tomcat/webapps/wwp.war
                                 echo "WAR file deployed successfully."
                                 echo "Restarting Tomcat..."
-                                sudo systemctl restart ${TOMCAT_SERVICE}
+                                sudo systemctl restart tomcat
                                 echo "Tomcat restarted."
                             EOF
                         """

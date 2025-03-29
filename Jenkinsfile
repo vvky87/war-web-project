@@ -4,7 +4,7 @@ pipeline {
     environment {
         TOMCAT_SERVER = "43.204.112.166"           // IP of the Tomcat server
         TOMCAT_USER = "ubuntu"                    // SSH username for Tomcat
-        TOMCAT_CREDENTIAL_ID = "tomcat_creds"     // Jenkins credentials ID for SSH (private key or username/password)
+        TOMCAT_CREDENTIAL_ID = "tomcat_creds"     // Jenkins credentials ID for SSH (private key)
         ART_VERSION = "1.0.0"                     // Version of the WAR file
         NEXUS_URL = "3.109.203.221:8081"          // Nexus repository URL
         NEXUS_REPOSITORY = "maven-releases"       // Nexus repository name
@@ -49,21 +49,22 @@ pipeline {
         }
 
         // Stage 3: Deploy the WAR to Tomcat
-    stage('Deploy to Tomcat') {
-    steps {
-        echo '🚀 Deploying WAR to Tomcat...'
-        sshagent (credentials: ['tomcat_creds']) {
-            sh '''
-                scp -o StrictHostKeyChecking=no target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
-                ssh -o StrictHostKeyChecking=no ${TOMCAT_USER}@${TOMCAT_SERVER} << 'EOF'
-                    sudo mv /tmp/*.war /opt/tomcat/webapps/
-                    sudo systemctl restart tomcat
-                EOF
-            '''
+        stage('Deploy to Tomcat') {
+            steps {
+                echo '🚀 Deploying WAR to Tomcat...'
+                timeout(time: 5, unit: 'MINUTES') {
+                    sshagent (credentials: [TOMCAT_CREDENTIAL_ID]) {
+                        sh '''
+                            scp -o StrictHostKeyChecking=no target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
+                            ssh -o StrictHostKeyChecking=no ${TOMCAT_USER}@${TOMCAT_SERVER} << 'EOF'
+                                sudo mv /tmp/*.war /opt/tomcat/webapps/
+                                sudo systemctl restart tomcat
+                            EOF
+                        '''
+                    }
+                }
+            }
         }
-    }
-}
-
 
         // Stage 4: Verify Deployment
         stage('Verify Deployment') {
@@ -74,7 +75,7 @@ pipeline {
                     if (status == "200") {
                         echo "🎉 Application deployed successfully and is accessible!"
                     } else {
-                        error "❌ Deployment verification failed with HTTP code ${status}"
+                        error "❌ Deployment verification failed with HTTP code ${status}. Check Tomcat logs for details."
                     }
                 }
             }

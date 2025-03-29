@@ -17,14 +17,15 @@ pipeline {
     }
 
     stages {
-        stage('SonarQube Analysis') {
-            steps {
-                script {
-                    def mvnCmd = "mvn sonar:sonar -Dsonar.projectKey=wwp -Dsonar.host.url=${SONAR_HOST_URL} -Dsonar.login=${env.SONAR_CREDENTIAL_ID}"
-                    sh mvnCmd
-                }
-            }
+  stage('SonarQube Analysis') {
+    steps {
+        script {
+            def mvnCmd = "mvn sonar:sonar -Dsonar.projectKey=wwp -Dsonar.host.url=http://${SONAR_HOST_URL} -Dsonar.login=${env.SONAR_CREDENTIAL_ID}"
+            sh mvnCmd
         }
+    }
+}
+
 
         stage('Build WAR') {
             steps {

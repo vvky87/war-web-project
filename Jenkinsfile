@@ -1,17 +1,17 @@
 pipeline {
-    agent any  // Runs on any available Jenkins agent
+    agent any
 
     environment {
-        TOMCAT_SERVER = "43.204.112.166"           // IP of the Tomcat server
-        TOMCAT_CREDENTIAL_ID = "tomcat_creds"      // Jenkins credentials ID for SSH (username/password)
-        ART_VERSION = "1.0.0"                     // Version of the WAR file
-        NEXUS_URL = "3.109.203.221:8081"          // Nexus repository URL
-        NEXUS_REPOSITORY = "maven-releases"       // Nexus repository name
-        NEXUS_CREDENTIAL_ID = "nexus_creds"       // Jenkins credentials for Nexus
+        TOMCAT_SERVER = "43.204.112.166"
+        TOMCAT_USER = "ubuntu"  // Use the same user as set up in passwordless SSH
+        ART_VERSION = "1.0.0"
+        NEXUS_URL = "3.109.203.221:8081"
+        NEXUS_REPOSITORY = "maven-releases"
+        NEXUS_CREDENTIAL_ID = "nexus_creds"
     }
 
     tools {
-        maven "maven"  // Use Maven to build the project
+        maven "maven"
     }
 
     stages {
@@ -19,8 +19,8 @@ pipeline {
         stage('Build WAR') {
             steps {
                 echo '🔨 Building WAR file...'
-                sh 'mvn clean package -DskipTests'  // Build without running tests
-                archiveArtifacts artifacts: '**/target/*.war'  // Archive the WAR file for later use
+                sh 'mvn clean package -DskipTests'
+                archiveArtifacts artifacts: '**/target/*.war'
             }
         }
 
@@ -35,7 +35,7 @@ pipeline {
                         nexusVersion: "nexus3",
                         protocol: "http",
                         nexusUrl: "${NEXUS_URL}",
-                        groupId: "com.example",   // Group ID from pom.xml
+                        groupId: "com.example",
                         version: "${ART_VERSION}",
                         repository: "${NEXUS_REPOSITORY}",
                         credentialsId: "${NEXUS_CREDENTIAL_ID}",
@@ -47,19 +47,17 @@ pipeline {
             }
         }
 
-        // Stage 3: Deploy the WAR to Tomcat
+        // Stage 3: Deploy the WAR to Tomcat (Without Credentials)
         stage('Deploy to Tomcat') {
             steps {
                 echo '🚀 Deploying WAR to Tomcat...'
-                withCredentials([usernamePassword(credentialsId: TOMCAT_CREDENTIAL_ID, usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                    sh '''
-                        scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null target/*.war ${USER}@${TOMCAT_SERVER}:/tmp/
-                        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${USER}@${TOMCAT_SERVER} << 'EOF'
-                            sudo mv /tmp/*.war /opt/tomcat/webapps/
-                            sudo systemctl restart tomcat
-                        EOF
-                    '''
-                }
+                sh '''
+                    scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
+                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} << 'EOF'
+                        sudo mv /tmp/*.war /opt/tomcat/webapps/
+                        sudo systemctl restart tomcat
+                    EOF
+                '''
             }
         }
 
@@ -79,7 +77,6 @@ pipeline {
         }
     }
 
-    // Post actions
     post {
         success {
             echo '✅ Pipeline completed successfully!'

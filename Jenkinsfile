@@ -8,7 +8,7 @@ pipeline {
         NEXUS_REPOSITORY = "maven-releases"
         NEXUS_CREDENTIAL_ID = "nexus_creds"
         SSH_KEY_PATH = "/var/lib/jenkins/.ssh/jenkins_key"
-        SONAR_HOST_URL = "13.233.68.209:9000"
+        SONAR_HOST_URL = "http://13.233.68.209:9000"
         SONAR_CREDENTIAL_ID = "sonar_creds"  // Replace with your SonarQube credential ID
     }
 
@@ -17,15 +17,18 @@ pipeline {
     }
 
     stages {
- stage('SonarQube Analysis') {
+        stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube Server') {  // Ensure "SonarQube Server" is configured in Jenkins → Manage Jenkins → Configure System
-                    sh """
-                        mvn sonar:sonar \
-                            -Dsonar.projectKey=wwp \
-                            -Dsonar.host.url=${env.SONAR_HOST_URL} \
-                            -Dsonar.login=${env.SONAR_CREDENTIAL_ID}
-                    """
+                withSonarQubeEnv('SonarQube Server') {  // Ensure "SonarQube Server" is configured in Jenkins
+                    script {
+                        def sonarToken = credentials(env.SONAR_CREDENTIAL_ID) // Inject SonarQube token securely
+                        sh """
+                            mvn sonar:sonar \
+                                -Dsonar.projectKey=wwp \
+                                -Dsonar.host.url=${env.SONAR_HOST_URL} \
+                                -Dsonar.login=${sonarToken}
+                        """
+                    }
                 }
             }
         }

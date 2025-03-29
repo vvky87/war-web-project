@@ -35,7 +35,7 @@ pipeline {
                     // Test SSH connectivity
                     sh '''
                         #!/bin/bash
-                        ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo "SSH connection successful!"' || { echo "SSH connection failed."; exit 1; }
+                        ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo "SSH connection successful!"' || { echo "SSH connection failed."; exit 1; }
                     '''
                 }
             }
@@ -91,9 +91,13 @@ pipeline {
 
                         sh '''
                             #!/bin/bash
-                            scp -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${warFilePath} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/wwp.war || { echo "SCP failed."; exit 1; }
+                            set -e
 
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} <<EOF
+                            # Copy WAR file to the remote server
+                            scp -o StrictHostKeyChecking=no -o BatchMode=yes -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${warFilePath} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/wwp.war || { echo "SCP failed."; exit 1; }
+
+                            # Deploy WAR file on the remote server
+                            ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} <<'EOF'
                                 set -e
                                 echo "Moving WAR file to Tomcat directory..."
                                 sudo mv /tmp/wwp.war /opt/tomcat/webapps/wwp.war

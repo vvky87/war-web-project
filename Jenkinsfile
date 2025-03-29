@@ -55,6 +55,15 @@ pipeline {
             }
         }
 
+        stage('Verify SSH Connection') {
+            steps {
+                echo '🔗 Verifying connection to Tomcat server...'
+                sh """
+                    ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} "echo 'Connection successful'"
+                """
+            }
+        }
+
         stage('Deploy to Tomcat') {
             steps {
                 echo '🚀 Deploying WAR to Tomcat...'
@@ -65,17 +74,19 @@ pipeline {
             }
         }
 
-        stage('Display Application and Nexus URLs') {
+        stage('Display URLs') {
             steps {
                 script {
-                    def appUrl = "http://${TOMCAT_SERVER}:8080/wwp-${env.ART_VERSION}"
-                    def nexusUrl = "http://${NEXUS_URL}/repository/${NEXUS_REPOSITORY}/koddas/web/war/wwp/${env.ART_VERSION}/wwp-${env.ART_VERSION}.war"
-
-                    // Displaying the links as clickable buttons in Jenkins Stage View
+                    def appUrl = "http://${TOMCAT_SERVER}:8080/wwp-${ART_VERSION}"
+                    def nexusUrl = "http://${NEXUS_URL}/repository/${NEXUS_REPOSITORY}/koddas/web/war/wwp/${ART_VERSION}/wwp-${ART_VERSION}.war"
+                    
                     currentBuild.description = """
-                        🌐 <a href='${appUrl}' target='_blank'>Access Application</a><br>
-                        📦 <a href='${nexusUrl}' target='_blank'>View Artifact in Nexus</a>
+                        <h2>✅ Deployment Successful!</h2>
+                        <p>🌐 <a href="${appUrl}" target="_blank">Access Application</a></p>
+                        <p>📦 <a href="${nexusUrl}" target="_blank">View Artifact in Nexus</a></p>
                     """
+                    echo "Application URL: ${appUrl}"
+                    echo "Nexus Artifact URL: ${nexusUrl}"
                 }
             }
         }

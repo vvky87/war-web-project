@@ -15,7 +15,22 @@ pipeline {
     }
 
     stages {
-        // Stage 1: Build the WAR file
+        // Stage 1: Verify Tomcat Connection
+        stage('Verify Tomcat Connection') {
+            steps {
+                echo '🔗 Verifying connection to Tomcat server...'
+                script {
+                    def sshTest = sh(script: "ssh -o BatchMode=yes -o ConnectTimeout=5 ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo connection successful'", returnStatus: true)
+                    if (sshTest != 0) {
+                        error "❌ Unable to establish SSH connection to Tomcat server at ${TOMCAT_SERVER}. Check network settings or SSH configuration."
+                    } else {
+                        echo "✅ SSH connection to Tomcat server established successfully!"
+                    }
+                }
+            }
+        }
+
+        // Stage 2: Build WAR file
         stage('Build WAR') {
             steps {
                 echo '🔨 Building WAR file...'
@@ -24,7 +39,7 @@ pipeline {
             }
         }
 
-        // Stage 2: Publish the WAR to Nexus Repository
+        // Stage 3: Publish to Nexus
         stage('Publish to Nexus') {
             steps {
                 echo '📦 Publishing WAR to Nexus...'
@@ -47,7 +62,7 @@ pipeline {
             }
         }
 
-        // Stage 3: Deploy the WAR to Tomcat (Without Credentials)
+        // Stage 4: Deploy to Tomcat
         stage('Deploy to Tomcat') {
             steps {
                 echo '🚀 Deploying WAR to Tomcat...'
@@ -61,7 +76,7 @@ pipeline {
             }
         }
 
-        // Stage 4: Verify Deployment
+        // Stage 5: Verify Deployment
         stage('Verify Deployment') {
             steps {
                 echo '✅ Verifying deployment...'

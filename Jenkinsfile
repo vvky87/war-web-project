@@ -9,6 +9,8 @@ pipeline {
         NEXUS_REPOSITORY = "maven-releases"
         NEXUS_CREDENTIAL_ID = "nexus_creds"
         SSH_KEY_PATH = "/var/lib/jenkins/.ssh/jenkins_key"
+        WAR_FILE = "simple-war-${ART_VERSION}.war"
+        TOMCAT_WEBAPPS = "/opt/tomcat/webapps"
     }
 
     tools {
@@ -57,10 +59,16 @@ pipeline {
         stage('Deploy to Tomcat') {
             steps {
                 echo '🚀 Deploying WAR to Tomcat...'
-                sh """
-                    scp -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
-                    ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} "sudo mv /tmp/*.war /opt/tomcat/webapps/ && sudo systemctl restart tomcat"
-                """
+                script {
+                    sh """
+                        scp -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null target/${WAR_FILE} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
+                        ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} "
+                            sudo mv /tmp/${WAR_FILE} ${TOMCAT_WEBAPPS}/ && 
+                            sudo chown tomcat:tomcat ${TOMCAT_WEBAPPS}/${WAR_FILE} && 
+                            sudo systemctl restart tomcat
+                        "
+                    """
+                }
             }
         }
 

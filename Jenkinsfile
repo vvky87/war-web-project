@@ -9,13 +9,13 @@ pipeline {
         NEXUS_VERSION = "nexus3"
         NEXUS_PROTOCOL = "http"
         NEXUS_URL = "3.109.133.197:8081"
-        NEXUS_REPOSITORY = "demo-release"
+        NEXUS_REPOSITORY = "maven-releases"
         NEXUS_CREDENTIAL_ID = "nexus_credentials"
-        ARTVERSION = "1.0.0"
-        TOMCAT_URL = "http://43.204.147.153:8080"
+        ART_VERSION = "1.0.0" // Align with the build log version
+        TOMCAT_URL = "http://43.204.112.166:8080" // Updated IP
         TOMCAT_CREDENTIAL_ID = "tomcat_credentials"
         TOMCAT_USERNAME = "tomcat-user"
-        TOMCAT_PASSWORD = "secure-password" // Update this to the correct password
+        TOMCAT_PASSWORD = "secure-password" // Update securely
     }
 
     stages {
@@ -30,20 +30,26 @@ pipeline {
             steps {
                 script {
                     def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
+                    def pomFile = "pom.xml"
+
                     if (!fileExists(warFile)) {
                         error("WAR file not found at ${warFile}")
                     }
+                    if (!fileExists(pomFile)) {
+                        error("POM file not found.")
+                    }
+
                     nexusArtifactUploader(
                         nexusVersion: "${NEXUS_VERSION}",
                         protocol: "${NEXUS_PROTOCOL}",
                         nexusUrl: "${NEXUS_URL}",
                         groupId: "com.example.warwebproject",
-                        version: "${ARTVERSION}",
+                        version: "${ART_VERSION}",
                         repository: "${NEXUS_REPOSITORY}",
                         credentialsId: "${NEXUS_CREDENTIAL_ID}",
                         artifacts: [
                             [artifactId: "wwp", classifier: '', file: warFile, type: "war"],
-                            [artifactId: "wwp", classifier: '', file: "pom.xml", type: "pom"]
+                            [artifactId: "wwp", classifier: '', file: pomFile, type: "pom"]
                         ]
                     )
                 }
@@ -53,24 +59,20 @@ pipeline {
         stage('Deploy WAR') {
             steps {
                 script {
-                    // Dynamically find the latest WAR file in the target directory
                     def warFilePath = sh(script: "find ${workspace}/target -name '*.war' -type f -print0 | xargs -0 ls -t | head -n 1", returnStdout: true).trim()
 
                     if (warFilePath) {
                         echo "WAR file located at: ${warFilePath}"
 
-                        // Deploy the WAR file to the remote server
                         sh """
-                            # Copy the WAR file to a temporary directory on the remote server
-                            scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ubuntu@43.204.147.153:/tmp/wwp.war
+                            scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ${warFilePath} ubuntu@43.204.112.166:/tmp/wwp.war
 
-                            # Move the WAR file to the correct directory and restart Tomcat
-                            ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ubuntu@43.204.147.153 <<EOF
+                            ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/jenkins_key ubuntu@43.204.112.166 <<EOF
                                 set -e
                                 echo "Moving WAR file to Tomcat directory..."
                                 sudo mv /tmp/wwp.war /opt/tomcat/webapps/wwp.war
-                                echo "WAR file deployed successfully to /opt/tomcat/webapps/wwp.war"
-                                
+                                echo "WAR file deployed successfully."
+
                                 echo "Restarting Tomcat..."
                                 sudo systemctl restart tomcat
                                 echo "Tomcat restarted."

@@ -2,13 +2,13 @@ pipeline {
     agent any
 
     environment {
+        TOMCAT_SERVER = "43.204.112.166"
+        TOMCAT_USER = "ubuntu"  // Use the Ubuntu user for connection
         ART_VERSION = "1.0.0"
         NEXUS_URL = "3.109.203.221:8081"
         NEXUS_REPOSITORY = "maven-releases"
         NEXUS_CREDENTIAL_ID = "nexus_creds"
-        TOMCAT_SERVER = "43.204.112.166"
-        TOMCAT_USER = "ubuntu"  // For connecting to Tomcat server
-        TOMCAT_CREDENTIAL_ID = "tomcat_creds"  // For status check post-deployment
+        SSH_KEY_PATH = "/var/lib/jenkins/.ssh/jenkins_key"  // Correct SSH key path
     }
 
     tools {
@@ -29,7 +29,6 @@ pipeline {
                 echo '📦 Publishing WAR to Nexus...'
                 script {
                     def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
-
                     nexusArtifactUploader(
                         nexusVersion: "nexus3",
                         protocol: "http",
@@ -49,18 +48,9 @@ pipeline {
         stage('Verify SSH Connection') {
             steps {
                 echo '🔗 Verifying connection to Tomcat server...'
-                script {
-                    def sshCommand = """
-                        ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo connection successful'
-                    """
-                    def sshTest = sh(script: sshCommand, returnStatus: true)
-
-                    if (sshTest != 0) {
-                        error "❌ Unable to establish SSH connection to Tomcat server at ${TOMCAT_SERVER}."
-                    } else {
-                        echo "✅ SSH connection established successfully!"
-                    }
-                }
+                sh """
+                    ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} echo "Connection successful"
+                """
             }
         }
 
@@ -68,8 +58,8 @@ pipeline {
             steps {
                 echo '🚀 Deploying WAR to Tomcat...'
                 sh """
-                    scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
-                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} << 'EOF'
+                    scp -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
+                    ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} << 'EOF'
                         sudo mv /tmp/*.war /opt/tomcat/webapps/
                         sudo systemctl restart tomcat
                     EOF
@@ -79,18 +69,13 @@ pipeline {
 
         stage('Verify Deployment') {
             steps {
-                echo '✅ Verifying deployment with Tomcat credentials...'
-                withCredentials([usernamePassword(credentialsId: "${TOMCAT_CREDENTIAL_ID}", usernameVariable: 'TOMCAT_USER', passwordVariable: 'TOMCAT_PASSWORD')]) {
-                    script {
-                        def status = sh(script: """
-                            curl -u ${TOMCAT_USER}:${TOMCAT_PASSWORD} -s -o /dev/null -w '%{http_code}' http://${TOMCAT_SERVER}:8080/simple-war
-                        """, returnStdout: true).trim()
-
-                        if (status == "200") {
-                            echo "🎉 Application deployed successfully and is accessible!"
-                        } else {
-                            error "❌ Deployment verification failed with HTTP code ${status}"
-                        }
+                echo '✅ Verifying deployment...'
+                script {
+                    def status = sh(script: "curl -s -o /dev/null -w '%{http_code}' http://${TOMCAT_SERVER}:8080/simple-war", returnStdout: true).trim()
+                    if (status == "200") {
+                        echo "🎉 Application deployed successfully and is accessible!"
+                    } else {
+                        error "❌ Deployment verification failed with HTTP code ${status}"
                     }
                 }
             }

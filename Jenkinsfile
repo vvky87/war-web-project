@@ -2,31 +2,33 @@ pipeline {
     agent any  // Runs on any available Jenkins agent
 
     environment {
-        TOMCAT_SERVER = "43.204.112.166"
-        TOMCAT_USER = "ubuntu"
-        TOMCAT_CREDENTIAL_ID = "tomcat_creds"
-        ART_VERSION = "1.0.0"
-        NEXUS_URL = "3.109.203.221:8081"
-        NEXUS_REPOSITORY = "maven-releases"
-        NEXUS_CREDENTIAL_ID = "nexus_creds"
+        TOMCAT_SERVER = "43.204.112.166"           // IP of the Tomcat server
+        TOMCAT_USER = "ubuntu"                    // SSH username for Tomcat
+        TOMCAT_CREDENTIAL_ID = "tomcat_creds"     // Jenkins credentials ID for SSH (private key or username/password)
+        ART_VERSION = "1.0.0"                     // Version of the WAR file
+        NEXUS_URL = "3.109.203.221:8081"          // Nexus repository URL
+        NEXUS_REPOSITORY = "maven-releases"       // Nexus repository name
+        NEXUS_CREDENTIAL_ID = "nexus_creds"       // Jenkins credentials for Nexus
     }
 
     tools {
-        maven "maven"  // Using Maven for building the project
+        maven "maven"  // Use Maven to build the project
     }
 
     stages {
+        // Stage 1: Build the WAR file
         stage('Build WAR') {
             steps {
-                echo 'Building WAR file...'
-                sh 'mvn clean package -DskipTests'  // Build the project without running tests
-                archiveArtifacts artifacts: '**/target/*.war'  // Archive the WAR file
+                echo '🔨 Building WAR file...'
+                sh 'mvn clean package -DskipTests'  // Build without running tests
+                archiveArtifacts artifacts: '**/target/*.war'  // Archive the WAR file for later use
             }
         }
 
+        // Stage 2: Publish the WAR to Nexus Repository
         stage('Publish to Nexus') {
             steps {
-                echo 'Publishing WAR to Nexus...'
+                echo '📦 Publishing WAR to Nexus...'
                 script {
                     def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
 
@@ -34,7 +36,7 @@ pipeline {
                         nexusVersion: "nexus3",
                         protocol: "http",
                         nexusUrl: "${NEXUS_URL}",
-                        groupId: "com.example",
+                        groupId: "com.example",   // Group ID from pom.xml
                         version: "${ART_VERSION}",
                         repository: "${NEXUS_REPOSITORY}",
                         credentialsId: "${NEXUS_CREDENTIAL_ID}",
@@ -46,28 +48,54 @@ pipeline {
             }
         }
 
+        // Stage 3: Deploy the WAR to Tomcat
         stage('Deploy to Tomcat') {
             steps {
-                echo 'Deploying WAR to Tomcat...'
-                withCredentials([sshUserPrivateKey(credentialsId: TOMCAT_CREDENTIAL_ID, keyFileVariable: 'SSH_KEY')]) {
+                echo '🚀 Deploying WAR to Tomcat...'
+                withCredentials([sshUserPrivateKey(credentialsId: "${TOMCAT_CREDENTIAL_ID}", keyFileVariable: 'SSH_KEY')]) {
                     sh '''
+                        # Copy the WAR file to Tomcat's /tmp directory
                         scp -i ${SSH_KEY} -o StrictHostKeyChecking=no target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
+
+                        # SSH into Tomcat server and deploy the WAR
                         ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no ${TOMCAT_USER}@${TOMCAT_SERVER} << 'EOF'
+                            # Move WAR to Tomcat's webapps directory
                             sudo mv /tmp/*.war /opt/tomcat/webapps/
+
+                            # Restart Tomcat to apply changes
                             sudo systemctl restart tomcat
+
+                            # Check if Tomcat is running
+                            sudo systemctl status tomcat
                         EOF
                     '''
                 }
             }
         }
+
+        // Stage 4: Verify Deployment
+        stage('Verify Deployment') {
+            steps {
+                echo '✅ Verifying deployment...'
+                script {
+                    def status = sh(script: "curl -s -o /dev/null -w '%{http_code}' http://${TOMCAT_SERVER}:8080/simple-war", returnStdout: true).trim()
+                    if (status == "200") {
+                        echo "🎉 Application deployed successfully and is accessible!"
+                    } else {
+                        error "❌ Deployment verification failed with HTTP code ${status}"
+                    }
+                }
+            }
+        }
     }
 
+    // Post actions
     post {
         success {
-            echo '✅ Deployment successful!'
+            echo '✅ Pipeline completed successfully!'
         }
         failure {
-            echo '❌ Deployment failed. Check the logs!'
+            echo '❌ Pipeline failed. Check the logs for errors.'
         }
     }
 }

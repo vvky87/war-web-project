@@ -55,15 +55,6 @@ pipeline {
             }
         }
 
-        stage('Verify SSH Connection') {
-            steps {
-                echo '🔗 Verifying connection to Tomcat server...'
-                sh """
-                    ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} "echo 'Connection successful'"
-                """
-            }
-        }
-
         stage('Deploy to Tomcat') {
             steps {
                 echo '🚀 Deploying WAR to Tomcat...'
@@ -80,9 +71,11 @@ pipeline {
                     def appUrl = "http://${TOMCAT_SERVER}:8080/wwp-${env.ART_VERSION}"
                     def nexusUrl = "http://${NEXUS_URL}/repository/${NEXUS_REPOSITORY}/koddas/web/war/wwp/${env.ART_VERSION}/wwp-${env.ART_VERSION}.war"
 
-                    echo "<a href='${appUrl}' target='_blank'>🌐 Access Application</a>"
-                    echo "<br>"
-                    echo "<a href='${nexusUrl}' target='_blank'>📦 View Artifact in Nexus</a>"
+                    // Displaying the links as clickable buttons in Jenkins Stage View
+                    currentBuild.description = """
+                        🌐 <a href='${appUrl}' target='_blank'>Access Application</a><br>
+                        📦 <a href='${nexusUrl}' target='_blank'>View Artifact in Nexus</a>
+                    """
                 }
             }
         }

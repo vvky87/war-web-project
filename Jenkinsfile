@@ -7,7 +7,8 @@ pipeline {
         NEXUS_REPOSITORY = "maven-releases"
         NEXUS_CREDENTIAL_ID = "nexus_creds"
         TOMCAT_SERVER = "43.204.112.166"
-        TOMCAT_USER = "admin"
+        TOMCAT_USER = "ubuntu"  // For connecting to Tomcat server
+        TOMCAT_CREDENTIAL_ID = "tomcat_creds"  // For status check post-deployment
     }
 
     tools {
@@ -50,7 +51,7 @@ pipeline {
                 echo '🔗 Verifying connection to Tomcat server...'
                 script {
                     def sshCommand = """
-                        ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo connection successful'
+                        ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo connection successful'
                     """
                     def sshTest = sh(script: sshCommand, returnStatus: true)
 
@@ -67,8 +68,8 @@ pipeline {
             steps {
                 echo '🚀 Deploying WAR to Tomcat...'
                 sh """
-                    scp -o StrictHostKeyChecking=no target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
-                    ssh -o StrictHostKeyChecking=no ${TOMCAT_USER}@${TOMCAT_SERVER} << 'EOF'
+                    scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
+                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} << 'EOF'
                         sudo mv /tmp/*.war /opt/tomcat/webapps/
                         sudo systemctl restart tomcat
                     EOF
@@ -78,12 +79,18 @@ pipeline {
 
         stage('Verify Deployment') {
             steps {
-                script {
-                    def status = sh(script: "curl -s -o /dev/null -w '%{http_code}' http://${TOMCAT_SERVER}:8080/simple-war", returnStdout: true).trim()
-                    if (status == "200") {
-                        echo "🎉 Application deployed successfully and is accessible!"
-                    } else {
-                        error "❌ Deployment verification failed with HTTP code ${status}"
+                echo '✅ Verifying deployment with Tomcat credentials...'
+                withCredentials([usernamePassword(credentialsId: "${TOMCAT_CREDENTIAL_ID}", usernameVariable: 'TOMCAT_USER', passwordVariable: 'TOMCAT_PASSWORD')]) {
+                    script {
+                        def status = sh(script: """
+                            curl -u ${TOMCAT_USER}:${TOMCAT_PASSWORD} -s -o /dev/null -w '%{http_code}' http://${TOMCAT_SERVER}:8080/simple-war
+                        """, returnStdout: true).trim()
+
+                        if (status == "200") {
+                            echo "🎉 Application deployed successfully and is accessible!"
+                        } else {
+                            error "❌ Deployment verification failed with HTTP code ${status}"
+                        }
                     }
                 }
             }

@@ -8,6 +8,7 @@ pipeline {
         NEXUS_REPOSITORY = "maven-releases"
         NEXUS_CREDENTIAL_ID = "nexus_creds"
         SSH_KEY_PATH = "/var/lib/jenkins/.ssh/jenkins_key"
+        ART_VERSION = ""  // Initialize version variable
     }
 
     tools {
@@ -29,6 +30,8 @@ pipeline {
                 script {
                     def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
                     def version = sh(script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout", returnStdout: true).trim()
+                    env.ART_VERSION = version  // Save version to environment variable
+
                     nexusArtifactUploader(
                         nexusVersion: "nexus3",
                         protocol: "http",
@@ -63,7 +66,7 @@ pipeline {
                     ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no ${TOMCAT_USER}@${TOMCAT_SERVER} 'sudo mv /tmp/*.war /opt/tomcat/webapps/ && sudo systemctl restart tomcat'
                 """
                 script {
-                    def appUrl = "http://${TOMCAT_SERVER}:8080/wwp-${version}"
+                    def appUrl = "http://${TOMCAT_SERVER}:8080/wwp-${env.ART_VERSION}"
                     echo "🚀 Application URL after deployment: ${appUrl}"
                 }
             }

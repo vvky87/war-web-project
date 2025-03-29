@@ -8,6 +8,8 @@ pipeline {
         NEXUS_REPOSITORY = "maven-releases"
         NEXUS_CREDENTIAL_ID = "nexus_creds"
         SSH_KEY_PATH = "/var/lib/jenkins/.ssh/jenkins_key"
+        SONAR_HOST_URL = "13.233.68.209:9000"
+        SONAR_CREDENTIAL_ID = "nexus_creds"  // Replace with your SonarQube credential ID
     }
 
     tools {
@@ -15,6 +17,15 @@ pipeline {
     }
 
     stages {
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def mvnCmd = "mvn sonar:sonar -Dsonar.projectKey=wwp -Dsonar.host.url=${SONAR_HOST_URL} -Dsonar.login=${env.SONAR_CREDENTIAL_ID}"
+                    sh mvnCmd
+                }
+            }
+        }
+
         stage('Build WAR') {
             steps {
                 sh 'mvn clean package -DskipTests'

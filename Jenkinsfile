@@ -8,7 +8,7 @@ pipeline {
         NEXUS_REPOSITORY = "maven-releases"
         NEXUS_CREDENTIAL_ID = "nexus_creds"
         SSH_KEY_PATH = "/var/lib/jenkins/.ssh/jenkins_key"
-        ART_VERSION = ""  // Initialize version variable
+        ART_VERSION = "0.0.0"  // Default version
     }
 
     tools {
@@ -30,7 +30,15 @@ pipeline {
                 script {
                     def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
                     def version = sh(script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout", returnStdout: true).trim()
-                    env.ART_VERSION = version  // Save version to environment variable
+                    
+                    // Debugging the version output
+                    echo "🔍 Extracted Version: ${version}"
+                    
+                    if (version) {
+                        env.ART_VERSION = version
+                    } else {
+                        error "❌ Version extraction failed. Check the pom.xml file."
+                    }
 
                     nexusArtifactUploader(
                         nexusVersion: "nexus3",
@@ -38,12 +46,13 @@ pipeline {
                         nexusUrl: "${NEXUS_URL}",
                         groupId: "koddas.web.war",
                         artifactId: "wwp",
-                        version: "${version}",
+                        version: "${env.ART_VERSION}",
                         repository: "${NEXUS_REPOSITORY}",
                         credentialsId: "${NEXUS_CREDENTIAL_ID}",
                         artifacts: [[artifactId: "wwp", file: warFile, type: "war"]]
                     )
-                    def nexusUrl = "http://${NEXUS_URL}/repository/${NEXUS_REPOSITORY}/koddas/web/war/wwp/${version}/wwp-${version}.war"
+                    
+                    def nexusUrl = "http://${NEXUS_URL}/repository/${NEXUS_REPOSITORY}/koddas/web/war/wwp/${env.ART_VERSION}/wwp-${env.ART_VERSION}.war"
                     echo "📦 Nexus Artifact URL: ${nexusUrl}"
                 }
             }

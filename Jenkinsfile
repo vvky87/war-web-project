@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         TOMCAT_SERVER = "43.204.112.166"
-        TOMCAT_USER = "admin"
+        TOMCAT_USER = "root"
         SSH_KEY_PATH = "/var/lib/jenkins/.ssh/jenkins_key"
         TOMCAT_URL = "http://${TOMCAT_SERVER}:8080"
         ART_VERSION = "1.0.0"

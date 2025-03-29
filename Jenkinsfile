@@ -3,12 +3,12 @@ pipeline {
 
     environment {
         TOMCAT_SERVER = "43.204.112.166"
-        TOMCAT_USER = "ubuntu"  // Use the Ubuntu user for connection
+        TOMCAT_USER = "ubuntu"
         ART_VERSION = "1.0.0"
         NEXUS_URL = "3.109.203.221:8081"
         NEXUS_REPOSITORY = "maven-releases"
         NEXUS_CREDENTIAL_ID = "nexus_creds"
-        SSH_KEY_PATH = "/var/lib/jenkins/.ssh/jenkins_key"  // Correct SSH key path
+        SSH_KEY_PATH = "/var/lib/jenkins/.ssh/jenkins_key"
     }
 
     tools {
@@ -49,7 +49,7 @@ pipeline {
             steps {
                 echo '🔗 Verifying connection to Tomcat server...'
                 sh """
-                    ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} echo "Connection successful"
+                    ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} "echo 'Connection successful'"
                 """
             }
         }
@@ -59,10 +59,7 @@ pipeline {
                 echo '🚀 Deploying WAR to Tomcat...'
                 sh """
                     scp -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
-                    ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} << 'EOF'
-                        sudo mv /tmp/*.war /opt/tomcat/webapps/
-                        sudo systemctl restart tomcat
-                    EOF
+                    ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} "sudo mv /tmp/*.war /opt/tomcat/webapps/ && sudo systemctl restart tomcat"
                 """
             }
         }

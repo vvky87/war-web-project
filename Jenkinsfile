@@ -12,7 +12,7 @@ pipeline {
     stages {
         stage('Declarative: Tool Install') {
             steps {
-                tool name: 'Maven', type: 'Tool'
+                tool name: 'maven', type: 'Tool'
             }
         }
 

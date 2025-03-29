@@ -4,7 +4,6 @@ pipeline {
     environment {
         TOMCAT_SERVER = "43.204.112.166"
         TOMCAT_USER = "ubuntu"
-        ART_VERSION = "1.0.0"
         NEXUS_URL = "3.109.203.221:8081"
         NEXUS_REPOSITORY = "maven-releases"
         NEXUS_CREDENTIAL_ID = "nexus_creds"
@@ -21,6 +20,17 @@ pipeline {
                 echo '🔨 Building WAR file...'
                 sh 'mvn clean package -DskipTests'
                 archiveArtifacts artifacts: '**/target/*.war'
+            }
+        }
+
+        stage('Extract Version') {
+            steps {
+                script {
+                    // Extract version from pom.xml
+                    def version = sh(script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout", returnStdout: true).trim()
+                    env.ART_VERSION = version
+                    echo "📦 Detected version: ${env.ART_VERSION}"
+                }
             }
         }
 

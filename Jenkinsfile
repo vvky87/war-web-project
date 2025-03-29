@@ -2,15 +2,13 @@ pipeline {
     agent any
 
     environment {
-        ART_VERSION = "1.0.0"  // Global declaration
+        ART_VERSION = "1.0.0"
         NEXUS_URL = "3.109.203.221:8081"
         NEXUS_REPOSITORY = "maven-releases"
         NEXUS_CREDENTIAL_ID = "nexus_creds"
         TOMCAT_SERVER = "43.204.112.166"
         TOMCAT_USER = "ubuntu"
-        SSH_PRIVATE_KEY = '''-----BEGIN RSA PRIVATE KEY-----
-        YOUR_PRIVATE_KEY_CONTENT_HERE
-        -----END RSA PRIVATE KEY-----'''
+        TOMCAT_PASSWORD = "your_password_here" // Replace with actual password
     }
 
     tools {
@@ -39,7 +37,7 @@ pipeline {
                         protocol: "http",
                         nexusUrl: "${NEXUS_URL}",
                         groupId: "com.example",
-                        version: "${ART_VERSION}",  // Now accessible
+                        version: "${ART_VERSION}",
                         repository: "${NEXUS_REPOSITORY}",
                         credentialsId: "${NEXUS_CREDENTIAL_ID}",
                         artifacts: [
@@ -56,14 +54,15 @@ pipeline {
                 script {
                     echo '🔗 Verifying connection to Tomcat server...'
 
-                    sh """
-                        mkdir -p ~/.ssh
-                        echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
-                        chmod 600 ~/.ssh/id_rsa
-                        ssh-keyscan -H ${TOMCAT_SERVER} >> ~/.ssh/known_hosts
-                    """
+                    // Check if sshpass is installed
+                    def sshpassInstalled = sh(script: "which sshpass || true", returnStatus: true)
+                    if (sshpassInstalled != 0) {
+                        error "❌ sshpass is not installed on Jenkins. Please install it to proceed."
+                    }
 
-                    def sshTest = sh(script: "ssh -o BatchMode=yes -o ConnectTimeout=5 -i ~/.ssh/id_rsa ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo connection successful'", returnStatus: true)
+                    // Test SSH connection using password
+                    def sshTest = sh(script: "sshpass -p '${TOMCAT_PASSWORD}' ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo connection successful'", returnStatus: true)
+
                     if (sshTest != 0) {
                         error "❌ Unable to establish SSH connection to Tomcat server at ${TOMCAT_SERVER}."
                     } else {
@@ -78,8 +77,8 @@ pipeline {
             steps {
                 echo '🚀 Deploying WAR to Tomcat...'
                 sh '''
-                    scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
-                    ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} << 'EOF'
+                    sshpass -p '${TOMCAT_PASSWORD}' scp -o StrictHostKeyChecking=no target/*.war ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
+                    sshpass -p '${TOMCAT_PASSWORD}' ssh -o StrictHostKeyChecking=no ${TOMCAT_USER}@${TOMCAT_SERVER} << 'EOF'
                         sudo mv /tmp/*.war /opt/tomcat/webapps/
                         sudo systemctl restart tomcat
                     EOF

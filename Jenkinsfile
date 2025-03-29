@@ -17,21 +17,19 @@ pipeline {
     }
 
     stages {
-        stage('SonarQube Analysis') {
+       stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube Server') {  // Ensure "SonarQube Server" is configured in Jenkins
-                    script {
-                        def sonarToken = credentials(env.SONAR_CREDENTIAL_ID) // Inject SonarQube token securely
+                withSonarQubeEnv('SonarQube Server') {
+                    withCredentials([string(credentialsId: env.SONAR_CREDENTIAL_ID, variable: 'SONAR_TOKEN')]) {
                         sh """
                             mvn sonar:sonar \
                                 -Dsonar.projectKey=wwp \
                                 -Dsonar.host.url=${env.SONAR_HOST_URL} \
-                                -Dsonar.login=${sonarToken}
+                                -Dsonar.login=${SONAR_TOKEN}
                         """
                     }
                 }
             }
-        }
 
 
         stage('Build WAR') {

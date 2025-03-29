@@ -3,13 +3,13 @@ pipeline {
 
     environment {
         TOMCAT_SERVER = "43.204.112.166"
-        TOMCAT_USER = "ubuntu"
-        SSH_KEY_PATH = "/var/lib/jenkins/.ssh/jenkins_key"
+        TOMCAT_USER = "ubuntu" // Changed from root to ubuntu
         TOMCAT_URL = "http://${TOMCAT_SERVER}:8080"
         ART_VERSION = "1.0.0"
         NEXUS_URL = "3.109.203.221:8081"
         NEXUS_REPOSITORY = "maven-releases"
         NEXUS_CREDENTIAL_ID = "nexus_creds"
+        TOMCAT_CREDENTIAL_ID = "tomcat_creds" // Credentials for copying WAR
     }
 
     tools {
@@ -17,30 +17,6 @@ pipeline {
     }
 
     stages {
-        stage('Setup SSH Key') {
-            steps {
-                script {
-                    if (!fileExists(SSH_KEY_PATH)) {
-                        echo "SSH key not found. Generating..."
-                        sh '''
-                            #!/bin/bash
-                            mkdir -p /var/lib/jenkins/.ssh
-                            ssh-keygen -t rsa -b 2048 -f ${SSH_KEY_PATH} -N ""
-                            chmod 600 ${SSH_KEY_PATH}
-                        '''
-                    } else {
-                        echo "SSH key exists."
-                    }
-
-                    // Test SSH connectivity
-                    sh '''
-                        #!/bin/bash
-                        ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo "SSH connection successful!"' || { echo "SSH connection failed."; exit 1; }
-                    '''
-                }
-            }
-        }
-
         stage('Build WAR') {
             steps {
                 sh '''
@@ -89,24 +65,26 @@ pipeline {
                     if (warFilePath) {
                         echo "WAR file located at: ${warFilePath}"
 
-                        sh '''
-                            #!/bin/bash
-                            set -e
-
-                            # Copy WAR file to the remote server
-                         scp -o StrictHostKeyChecking=no -o BatchMode=yes -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${warFilePath} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/wwp.war
-
-                            # Deploy WAR file on the remote server
-                            ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} <<'EOF'
+                        sshagent([TOMCAT_CREDENTIAL_ID]) {
+                            sh '''
+                                #!/bin/bash
                                 set -e
-                                echo "Moving WAR file to Tomcat directory..."
-                                sudo mv /tmp/wwp.war /opt/tomcat/webapps/wwp.war
-                                echo "WAR file deployed successfully."
-                                echo "Restarting Tomcat..."
-                                sudo systemctl restart tomcat
-                                echo "Tomcat restarted."
-                            EOF
-                        '''
+
+                                # Copy WAR file to the remote server
+                                scp -o StrictHostKeyChecking=no -o BatchMode=yes ${warFilePath} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/wwp.war || { echo "SCP failed."; exit 1; }
+
+                                # Deploy WAR file on the remote server
+                                ssh -o StrictHostKeyChecking=no -o BatchMode=yes ${TOMCAT_USER}@${TOMCAT_SERVER} <<'EOF'
+                                    set -e
+                                    echo "Moving WAR file to Tomcat directory..."
+                                    sudo mv /tmp/wwp.war /opt/tomcat/webapps/wwp.war
+                                    echo "WAR file deployed successfully."
+                                    echo "Restarting Tomcat..."
+                                    sudo systemctl restart tomcat
+                                    echo "Tomcat restarted."
+                                EOF
+                            '''
+                        }
                     } else {
                         error "No WAR file found to deploy."
                     }

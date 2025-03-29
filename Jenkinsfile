@@ -22,26 +22,31 @@ pipeline {
                 script {
                     if (!fileExists(SSH_KEY_PATH)) {
                         echo "SSH key not found. Generating..."
-                        sh """
+                        sh '''
+                            #!/bin/bash
                             mkdir -p /var/lib/jenkins/.ssh
                             ssh-keygen -t rsa -b 2048 -f ${SSH_KEY_PATH} -N ""
                             chmod 600 ${SSH_KEY_PATH}
-                        """
+                        '''
                     } else {
                         echo "SSH key exists."
                     }
 
                     // Test SSH connectivity
-                    sh """
-                        ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo "SSH connection successful!"' || error("SSH connection failed. Check key permissions and remote server access.")
-                    """
+                    sh '''
+                        #!/bin/bash
+                        ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'echo "SSH connection successful!"' || { echo "SSH connection failed."; exit 1; }
+                    '''
                 }
             }
         }
 
         stage('Build WAR') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                sh '''
+                    #!/bin/bash
+                    mvn clean package -DskipTests
+                '''
                 archiveArtifacts artifacts: '**/target/*.war'
             }
         }
@@ -84,8 +89,9 @@ pipeline {
                     if (warFilePath) {
                         echo "WAR file located at: ${warFilePath}"
 
-                        sh """
-                            scp -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${warFilePath} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/wwp.war || error("SCP failed. Check SSH key permissions and server access.")
+                        sh '''
+                            #!/bin/bash
+                            scp -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${warFilePath} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/wwp.war || { echo "SCP failed."; exit 1; }
 
                             ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} <<EOF
                                 set -e
@@ -96,7 +102,7 @@ pipeline {
                                 sudo systemctl restart tomcat
                                 echo "Tomcat restarted."
                             EOF
-                        """
+                        '''
                     } else {
                         error "No WAR file found to deploy."
                     }

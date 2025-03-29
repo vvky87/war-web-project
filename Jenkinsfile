@@ -24,13 +24,6 @@ pipeline {
             }
         }
 
-        stage('Verify WAR File') {
-            steps {
-                echo '🔍 Verifying WAR file existence...'
-                sh 'ls -l target/*.war'
-            }
-        }
-
         stage('Publish to Nexus') {
             steps {
                 echo '📦 Publishing WAR to Nexus...'
@@ -69,10 +62,7 @@ pipeline {
                     if (fileExists(warFile)) {
                         sh """
                             scp -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${warFile} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
-                            ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} "
-                                sudo mv /tmp/$(basename ${warFile}) /opt/tomcat/webapps/ &&
-                                sudo systemctl restart tomcat
-                            "
+                            ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} 'sudo mv /tmp/$(basename ${warFile}) /opt/tomcat/webapps/ && sudo systemctl restart tomcat'
                         """
                     } else {
                         error "❌ WAR file not found: ${warFile}"

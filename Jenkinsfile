@@ -7,11 +7,13 @@ pipeline {
         TOMCAT_KEY = '/var/lib/jenkins/.ssh/jenkins_key'
         TOMCAT_WEBAPPS_DIR = '/opt/tomcat/webapps/'
         NEXUS_URL = 'http://3.109.203.221:8081/repository/maven-releases/'
+        PATH = "/usr/bin:${env.PATH}" // Ensure Maven is in the PATH
     }
 
     stages {
         stage('Declarative: Tool Install') {
             steps {
+                echo "🔧 Installing Maven tool..."
                 tool name: 'maven', type: 'Tool'
             }
         }
@@ -19,6 +21,7 @@ pipeline {
         stage('Build WAR') {
             steps {
                 echo "🔨 Building WAR file..."
+                sh 'mvn -v'  // Verify Maven version
                 sh 'mvn clean package -DskipTests'
                 archiveArtifacts artifacts: 'target/*.war', allowEmptyArchive: true
             }
@@ -38,7 +41,7 @@ pipeline {
             steps {
                 echo "📦 Publishing WAR to Nexus..."
                 sh """
-                    find target -name *.war -print -quit | xargs -I {} mvn deploy:deploy-file -Dfile={} -DgroupId=com.example -DartifactId=simple-war -Dversion=${env.ART_VERSION} -DrepositoryId=maven-releases -Durl=${env.NEXUS_URL}
+                    find target -name '*.war' -print -quit | xargs -I {} mvn deploy:deploy-file -Dfile={} -DgroupId=com.example -DartifactId=simple-war -Dversion=${env.ART_VERSION} -DrepositoryId=maven-releases -Durl=${env.NEXUS_URL}
                 """
             }
         }

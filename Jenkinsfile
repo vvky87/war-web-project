@@ -9,8 +9,6 @@ pipeline {
         NEXUS_REPOSITORY = "maven-releases"
         NEXUS_CREDENTIAL_ID = "nexus_creds"
         SSH_KEY_PATH = "/var/lib/jenkins/.ssh/jenkins_key"
-        WAR_FILE = "simple-war-${ART_VERSION}.war"
-        TOMCAT_WEBAPPS = "/opt/tomcat/webapps"
     }
 
     tools {
@@ -23,6 +21,13 @@ pipeline {
                 echo '🔨 Building WAR file...'
                 sh 'mvn clean package -DskipTests'
                 archiveArtifacts artifacts: '**/target/*.war'
+            }
+        }
+
+        stage('Verify WAR File') {
+            steps {
+                echo '🔍 Verifying WAR file existence...'
+                sh 'ls -l target/*.war'
             }
         }
 
@@ -60,14 +65,18 @@ pipeline {
             steps {
                 echo '🚀 Deploying WAR to Tomcat...'
                 script {
-                    sh """
-                        scp -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null target/${WAR_FILE} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
-                        ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} "
-                            sudo mv /tmp/${WAR_FILE} ${TOMCAT_WEBAPPS}/ && 
-                            sudo chown tomcat:tomcat ${TOMCAT_WEBAPPS}/${WAR_FILE} && 
-                            sudo systemctl restart tomcat
-                        "
-                    """
+                    def warFile = sh(script: 'find target -name "*.war" -print -quit', returnStdout: true).trim()
+                    if (fileExists(warFile)) {
+                        sh """
+                            scp -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${warFile} ${TOMCAT_USER}@${TOMCAT_SERVER}:/tmp/
+                            ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${TOMCAT_USER}@${TOMCAT_SERVER} "
+                                sudo mv /tmp/$(basename ${warFile}) /opt/tomcat/webapps/ &&
+                                sudo systemctl restart tomcat
+                            "
+                        """
+                    } else {
+                        error "❌ WAR file not found: ${warFile}"
+                    }
                 }
             }
         }

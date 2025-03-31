@@ -25,7 +25,8 @@ stage('SonarQube Analysis') {
                             mvn sonar:sonar \
                                 -Dsonar.projectKey=wwp \
                                 -Dsonar.host.url=${env.SONAR_HOST_URL} \
-                                -Dsonar.login=${SONAR_TOKEN}
+                                -Dsonar.login=${SONAR_TOKEN} \
+                                -Dsonar.java.binaries=target/classes
                         """
                     }
                 }

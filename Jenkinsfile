@@ -17,6 +17,12 @@ pipeline {
     }
 
     stages {
+                stage('Build WAR') {
+            steps {
+                sh 'mvn clean package -DskipTests'
+                archiveArtifacts artifacts: '**/target/*.war'
+            }
+        }
 stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube Server') {
@@ -32,14 +38,7 @@ stage('SonarQube Analysis') {
                 }
             }
 }
-        stage('Build WAR') {
-            steps {
-                sh 'mvn clean package -DskipTests'
-                archiveArtifacts artifacts: '**/target/*.war'
-            }
-        }
-
-        stage('Extract Version') {
+       stage('Extract Version') {
             steps {
                 script {
                     env.ART_VERSION = sh(script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout", returnStdout: true).trim()
